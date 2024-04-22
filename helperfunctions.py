@@ -10,10 +10,9 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error
 
-
-#################### HELPERFUNCTIONS ####################
-
-##### DATASET FUNCTIONS #####
+###############################################################################
+# DATASET FUNCTIONS
+###############################################################################
 # define function to read in data
 def fun_load_file(path, name):
 
@@ -39,9 +38,19 @@ def fun_split_X_y(data):
     y = data['Shapley Value']
     return X, y
 
+# function to edit a column in the dataset
+def fun_edit_data(data, column, column_name, problem='TSP', file_name='combined_train_instances_dennis'):
+    data[column_name] = column
+    if (problem == 'TSP'):
+        data.to_excel('../01_data/01_TSP/' + str(file_name) + '.xlsx')
+    elif (problem == 'CVRP'):
+        data.to_excel('../01_data/02_CVRP/' + str(file_name) + '.xlsx')
 
 
-##### TIME FUNCTIONS #####
+
+###############################################################################
+# TIME FUNCTIONS
+###############################################################################
 # function to stop time and convert seconds to minutes/hours
 def fun_convert_time(start, end):
     seconds = int(end - start)
@@ -66,7 +75,9 @@ def fun_fit_gridsearch_time(model, X_train, y_train):
 
 
 
-##### SCORING FUNCTIONS #####
+###############################################################################
+# SCORING FUNCTIONS
+###############################################################################
 # compute train score with cross validation
 def fun_train_score(model, X_train, y_train, cv=10, return_results=False):
     start = time.time()
@@ -137,7 +148,9 @@ def fun_category_scores(model, X, y, display_df=True):
 
 
 
-##### FEATURE FUNCTIONS #####
+###############################################################################
+# FEATURE FUNCTIONS
+###############################################################################
 # view top ten absolute feature weights
 def fun_feature_weights(model, X_train):
     feature_weights = pd.Series(data=model.coef_, index=X_train.columns)
