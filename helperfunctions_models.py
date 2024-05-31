@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib_inline
-
 import seaborn as sns
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.model_selection import cross_val_score, cross_validate
@@ -13,32 +12,31 @@ from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error
 ###############################################################################
 # DATASET FUNCTIONS
 ###############################################################################
-# define function to read in data
-def fun_load_file(path, name):
+# Function to read in data
+def fun_load_file(subfolder_path, name):
 
-    # select current working directory and subfolder to load the files
+    # Select current working directory and subfolder to load the files
     current_directory = os.getcwd()
-    subfolder_path = path
     file_path = os.path.join(current_directory, subfolder_path, name)
 
-    # load the file
+    # Load the file
     return pd.read_excel(io=file_path)
 
-# select columns for training
+# Select columns for training
 def fun_preprocessing(data):
     columns = [i for i in data.columns]
-    extracted_features = ['Unnamed: 0.1', 'Unnamed: 0', 'Shapley Value Cluster', 'SHAPO', 'Percentage_error']
+    extracted_features = ['Unnamed: 0.1', 'Unnamed: 0', 'Shapley Value Cluster', 'SHAPO', 'Percentage_error', 'Percentage Error']
     train_features = [i for i in columns if i not in extracted_features]
     train_data = data[train_features]
     return train_data
 
-# split dataset into features and target (shapley value)
+# Split dataset into features and target (shapley value)
 def fun_split_X_y(data):
     X = data[[i for i in data.columns if not i == 'Shapley Value']]
     y = data['Shapley Value']
     return X, y
 
-# function to edit a column in the dataset
+# Function to edit a column in the dataset
 def fun_edit_data(data, column, column_name, problem='TSP', file_name='combined_train_instances_dennis'):
     data[column_name] = column
     if (problem == 'TSP'):
@@ -51,7 +49,7 @@ def fun_edit_data(data, column, column_name, problem='TSP', file_name='combined_
 ###############################################################################
 # TIME FUNCTIONS
 ###############################################################################
-# function to stop time and convert seconds to minutes/hours
+# Function to stop time and convert seconds to minutes/hours
 def fun_convert_time(start, end):
     seconds = int(end - start)
     if seconds < 60:
@@ -66,7 +64,7 @@ def fun_convert_time(start, end):
         computation_time = f'{hours} h, {remaining_minutes} min'
     return computation_time
 
-# measure fit time of a model
+# Measure fit time of a model
 def fun_fit_gridsearch_time(model, X_train, y_train):
     start = time.time()
     model.fit(X_train, y_train)
@@ -78,7 +76,7 @@ def fun_fit_gridsearch_time(model, X_train, y_train):
 ###############################################################################
 # SCORING FUNCTIONS
 ###############################################################################
-# compute train score with cross validation
+# Compute train score with cross validation
 def fun_train_score(model, X_train, y_train, cv=10, return_results=False):
     start = time.time()
     cv_scores = cross_validate(estimator=model, X=X_train, y=y_train, cv=cv,
@@ -95,7 +93,7 @@ def fun_train_score(model, X_train, y_train, cv=10, return_results=False):
 
     if (return_results == True): return MAPE, RMSE, computation_time
 
-# grid search best model
+# Grid search best model
 def fun_best_model(grid_search_model, X_train, y_train, view_results_df=False, return_scores=False):
 
     MAPE = - np.round(grid_search_model.best_score_, 6) * 100
@@ -116,7 +114,7 @@ def fun_best_model(grid_search_model, X_train, y_train, view_results_df=False, r
     
     if (return_scores == True): return MAPE, RMSE
 
-# compute test score
+# Compute test score
 def fun_test_score(model, X_test, y_test, print_params=False):
     prediction = model.predict(X_test)
     MAPE = np.round(mean_absolute_percentage_error(y_true=y_test, y_pred=prediction), 6) * 100
@@ -129,14 +127,14 @@ def fun_test_score(model, X_test, y_test, print_params=False):
     print('\nMAPE test data: {} %'.format(MAPE))
     print('RMSE test data: {}'.format(RMSE))
 
-# compute error measures for each instance size group
+# Compute error measures for each instance size group
 def fun_category_scores(model, X, y, display_df=True):
 
-    # group X by instance size and apply for each group the error measure fct. Use indices of each group to select the regarding true y values and predict y with group
+    # Group X by instance size and apply for each group the error measure fct. Use indices of each group to select the regarding true y values and predict y with group
     MAPE = X.groupby(by='Number Customers').apply(lambda group: mean_absolute_percentage_error(y_true=y.loc[group.index], y_pred=model.predict(group)))
     RMSE = X.groupby(by='Number Customers').apply(lambda group: mean_squared_error(y_true=y.loc[group.index], y_pred=model.predict(group), squared=False))
 
-    # round restults and merge them into a data frame
+    # Round restults and merge them into a data frame
     MAPE = np.round(MAPE, 6) * 100
     RMSE = np.round(RMSE, 4)
     df = pd.DataFrame(data=[MAPE, RMSE], index=['MAPE', 'RMSE'])
@@ -151,28 +149,28 @@ def fun_category_scores(model, X, y, display_df=True):
 ###############################################################################
 # FEATURE FUNCTIONS
 ###############################################################################
-# view top ten absolute feature weights
+# View top ten absolute feature weights
 def fun_feature_weights(model, X_train):
     feature_weights = pd.Series(data=model.coef_, index=X_train.columns)
     print('\nFeature weights: \n{}'.format(np.abs(feature_weights).sort_values(ascending=False)[:10]))
     print('\nBias:', model.intercept_)
 
     if any(model.coef_ == 0):
-        # number of used features
+        # Number of used features
         print('\nNumber of used features:', np.sum(model.coef_ != 0))
         print('Number of not used features:', np.sum(model.coef_ == 0))
 
-        # features with zero weight
+        # Features with zero weight
         print('\nNot used features: \n{}'.format(feature_weights.index[feature_weights == 0]))
 
-# view feature importance of the tree based models
+# View feature importance of the tree based models
 def plot_feature_importances(model, X_train, all_features=True):
     
     if (all_features == True):
         plt.figure(figsize=(8, 10))
         indizes = range(n_features)
     else:
-        # show only the used features
+        # Show only the used features
         plt.figure(figsize=(8, 4))
         indizes = np.where(model.feature_importances_ > 0.001)[0]
         n_features = len(indizes)
@@ -182,12 +180,12 @@ def plot_feature_importances(model, X_train, all_features=True):
     plt.xlabel('Feature importance')
     plt.ylabel('Feature')
 
-# function to plot a heatmap with the grid search cv scores (MAPE) of the parameter combinations
+# Function to plot a heatmap with the grid search cv scores (MAPE) of the parameter combinations
 def plot_heatmap(scores_list, param_grid, different_scalers=True):
     if (different_scalers == True): scalers_list = [StandardScaler(), MinMaxScaler(), RobustScaler()]
     parameters = list(param_grid.keys())
 
-    # reshape the scores array for heatmap
+    # Reshape the scores array for heatmap
     if (len(parameters) == 1):
         n_rows = 1
         n_cols = -1
@@ -206,7 +204,7 @@ def plot_heatmap(scores_list, param_grid, different_scalers=True):
     # Create subplots
     fig, axes = plt.subplots(1, 3, figsize=plotsize)
 
-    # iterate over all scalers
+    # Iterate over all scalers
     for scaler, ax in enumerate(axes):
         scores = scores_list[scaler].reshape(n_rows, n_cols) 
 
@@ -215,7 +213,7 @@ def plot_heatmap(scores_list, param_grid, different_scalers=True):
         if (len(parameters) !=1): ax.set_ylabel(y_label)
         ax.set_title(scalers_list[scaler])
             
-        # annotating each cell with its corresponding score
+        # Annotating each cell with its corresponding score
         for i in range(len(scores)):
             for j in range(len(scores[i])):
                 text = ax.text(j + 0.5, i + 0.5, f"{scores[i, j]:.2f}", ha='center', va='center', color='darkgrey')
