@@ -20,7 +20,7 @@ from sklearn.cluster import DBSCAN
 # Functions for generating instances and loading or saving a file
 ###############################################################################
 # Function to generate a TSP instance
-def generate_random_tsp_instance(num_customers, x_range, y_range):
+def generate_tsp_instance(num_customers, x_range, y_range):
     """
     Parameters
     ----------
@@ -44,28 +44,51 @@ def generate_random_tsp_instance(num_customers, x_range, y_range):
     for _ in range(num_customers):
         x = random.uniform(x_range[0], x_range[1])
         y = random.uniform(y_range[0], y_range[1])
-        customer_data.append({'X': x, 'Y': y}) # list with dictionaries. One for each customer with X and Y coordinate
+        customer_data.append({'X': x, 'Y': y}) # List with dictionaries. One for each customer with X and Y coordinate
 
     # Generate random X and Y coordinates for the depot
-    depot_x = random.uniform(x_range[0], x_range[1])
-    depot_y = random.uniform(y_range[0], y_range[1])
-    depot_data = {'X': depot_x, 'Y': depot_y}
+    x_depot = random.uniform(x_range[0], x_range[1])
+    y_depot = random.uniform(y_range[0], y_range[1])
+    depot_data = {'X': x_depot, 'Y': y_depot}
 
     # Insert the depot data at the beginning of the list
     customer_data.insert(0, depot_data)
 
     # Create a DataFrame from the list of customer locations
-    customer_locations = pd.DataFrame(customer_data) # one row for each customer with X and Y coordinate. First row is the depot
+    customer_locations = pd.DataFrame(customer_data) # One row for each customer with X and Y coordinate. First row is the depot
 
     return customer_locations
 
+# Function to generate a CVRP instance
+def generate_cvrp_instance(num_customers, x_range, y_range, demand_min, demand_max, capacity_min, capacity_max):
+    # Create a DataFrame to store customer locations
+    columns = ['X', 'Y', 'Vehicle Capacity', 'Demand']
+    customer_locations = pd.DataFrame(columns=columns)
+    capacity = random.randint(capacity_min, capacity_max)
 
+    # Generate random X and Y coordinates for each customer
+    for row in range(num_customers):
+        x = random.uniform(x_range[0], x_range[1])
+        y = random.uniform(y_range[0], y_range[1])
+        demand = random.randint(demand_min, demand_max)
+        
+        # Add the data as new row to the DataFrame
+        customer_locations.loc[row] = [x, y, capacity, demand]
+
+    # Insert the depot in the first row
+    x_depot = random.uniform(x_range[0], x_range[1])
+    y_depot = random.uniform(y_range[0], y_range[1])
+    depot = pd.DataFrame({'X': [x_depot], 'Y': [y_depot], 'Vehicle Capacity': capacity, 'Demand': 0})
+    customer_locations = pd.concat([depot, customer_locations]).reset_index(drop=True)
+    
+    # Add total deamand
+    customer_locations['Total Demand'] = customer_locations['Demand'].sum()
+
+    return customer_locations
 
 # Function to calculate the distance between two coordinates
 def distance(coord1, coord2):
     return np.sqrt((coord1[0] - coord2[0]) ** 2 + (coord1[1] - coord2[1]) ** 2)
-
-
 
 # Function to turn seconds into minutes, hours, days
 def fun_convert_time(start=None, end=None, seconds=None):
@@ -86,21 +109,17 @@ def fun_convert_time(start=None, end=None, seconds=None):
         computation_time = f'{int(days)}d, {int(remaining_hours)}h'
     return computation_time
 
-
-
 # Function to save data as excel sheet
 def fun_save_file(data, subfolder_path, name):
 
-    # select current working directory and subfolder to load the files
+    # Select current working directory and subfolder to load the files
     current_directory = os.getcwd()
     file_path = os.path.join(current_directory, subfolder_path, name)
 
-    # save the file
+    # Save the file
     data.to_excel(file_path)
     
     return print('File saved successfully!')
-
-
 
 # Function to read in data
 def fun_load_file(subfolder_path, name):
@@ -115,7 +134,7 @@ def fun_load_file(subfolder_path, name):
 
 
 ###############################################################################
-# Functions for TSP solving & Shapley Value
+# Functions for solving TSP/CVRP & Shapley Value
 ###############################################################################
 # Function to compute Shapley value
 def fun_shapley_value(player_index, characteristic_function, prints=False):
@@ -125,7 +144,7 @@ def fun_shapley_value(player_index, characteristic_function, prints=False):
     player_index : int
         index of customer
     characteristic_function : dictionary
-        characteristic function of the tsp instance -> all possible subsets of the customers as keys and the respective total costs of the subsets as values
+        characteristic function of the instance -> all possible subsets of the customers as keys and the respective total costs of the subsets as values
     prints : boolean
         prints interim results for understanding/debugging
     
@@ -182,8 +201,6 @@ def fun_shapley_value(player_index, characteristic_function, prints=False):
     
     return shapley_value
 
-
-
 # Function to solve TSP with Gurobi
 def solve_tsp(coordinates):
     # Create a Gurobi model
@@ -223,7 +240,7 @@ def solve_tsp(coordinates):
     model.Params.OutputFlag = 0
     model.Params.Presolve = 2  # Aggressive presolve
     model.Params.LazyConstraints = 1
-    model.Params.MIPGap = 0.0001 # stop after Gap smaller than 0.01 %
+    model.Params.MIPGap = 0.0001 # Stop after Gap smaller than 0.01 %
     model.optimize()
 
     # Extract the solution
@@ -234,10 +251,90 @@ def solve_tsp(coordinates):
     else:
         return None, None
 
+# Function to solve CVRP with Gurobi
+def solve_cvrp(coordinates, demands, capacity):
+    num_nodes = len(coordinates)
 
+    # Create a Gurobi model
+    model = gp.Model('CVRP')
 
-# Function to visualize TSP and the optimal solution; additionally you can view cluster assignments of the corresponding model (DBSCAN)
-def plot_tsp(coord, sequence, total_costs, x_range, y_range, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
+    # Decision variables
+    x = {}
+    for i in range(num_nodes):
+        for j in range(num_nodes):
+            if i != j:
+                x[i, j] = model.addVar(vtype=gp.GRB.BINARY, name=f'x_{i}_{j}')
+
+    # Vehicle flow variables
+    u = {}
+    for i in range(1, num_nodes):
+        u[i] = model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0.0, name=f'u_{i}')
+
+    model.update()
+
+    # Objective function (minimize total distance)
+    model.setObjective(
+        gp.quicksum(
+            ((coordinates[i][0] - coordinates[j][0]) ** 2 + (coordinates[i][1] - coordinates[j][1]) ** 2) ** 0.5 * x[i, j]
+            for i in range(num_nodes) for j in range(num_nodes) if i != j
+        ),
+        gp.GRB.MINIMIZE
+    )
+
+    # Constraints
+
+    # Each customer is visited exactly once
+    for i in range(1, num_nodes):
+        model.addConstr(gp.quicksum(x[i, j] for j in range(num_nodes) if i != j) == 1, name=f'visit_{i}')
+
+    # Each customer is left exactly once
+    for j in range(1, num_nodes):
+        model.addConstr(gp.quicksum(x[i, j] for i in range(num_nodes) if i != j) == 1, name=f'leave_{j}')
+
+    # Capacity constraint
+    for i in range(1, num_nodes):
+        model.addConstr(u[i] >= demands[i], name=f'capacity_{i}')
+        model.addConstr(u[i] <= capacity, name=f'capacity_{i}')
+
+    # Subtour elimination constraints
+    for i in range(1, num_nodes):
+        for j in range(1, num_nodes):
+            if i != j:
+                model.addConstr(
+                    u[i] - u[j] + capacity * x[i, j] <= capacity - demands[j],
+                    name=f'subtour_{i}_{j}'
+            )
+    model.Params.OutputFlag = 0
+    model.Params.Presolve = 2  # Aggressive presolve
+    model.Params.LazyConstraints = 1
+    model.Params.MIPGap = 0.001
+
+    model.optimize()
+
+    if model.status == gp.GRB.OPTIMAL:
+        routes = []
+        for i in range(1, num_nodes):
+            if x[0, i].x > 0.5:
+                #print('Route starts at customer', i)
+                sequence = [0,i]
+                
+                # Search for the next customer, always save the sequence, and ensure it's different from the previous one
+                while sequence[-1] != 0:
+                    next_customer = [j for j in range(num_nodes) if j != sequence[-1] and x[sequence[-1], j].x > 0.5][0]
+                    sequence.append(next_customer)
+                
+                routes.append(sequence)
+                
+        # Convert sequence to the same format as it is in the TSP
+        routes = [(route[trip], route[trip+1]) for route in routes for trip in range(len(route)-1)]
+        
+        total_cost = model.objVal
+        return routes, total_cost
+    else:
+        return None, None
+
+# Function to visualize an instance and its optimal solution; additionally you can view cluster assignments of the corresponding model (DBSCAN)
+def plot_instance(coord, sequence, total_costs, x_range, y_range, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
     
     if (print_sequence == True): print('Total costs: {}\nOptimal solution: {}'.format(total_costs, sequence))
 
@@ -258,8 +355,8 @@ def plot_tsp(coord, sequence, total_costs, x_range, y_range, assignments=None, c
             y = coord[origin][1]
             dx = coord[destination][0] - coord[origin][0]
             dy = coord[destination][1] - coord[origin][1]
-            plt.arrow(x=x, y=y, dx=dx, dy=dy,
-                    head_width=2, head_length=3, fc='silver', ec='silver', length_includes_head=True)
+            plt.arrow(x=x, y=y, dx=dx, dy=dy, head_width=2, head_length=3, 
+                    fc='silver', ec='silver', length_includes_head=True)
 
     # Create scatter plot with depot (black) and customers (blue)
     plt.scatter(x=depot_coord[0], y=depot_coord[1], color='black', label='Depot', marker='s', s=50)
@@ -314,7 +411,7 @@ def plot_tsp(coord, sequence, total_costs, x_range, y_range, assignments=None, c
 ###############################################################################
 # Functions for cluster features
 ###############################################################################
-# Function to apply the DBSCAN algorithm multiple times on a TSP instance
+# Function to apply the DBSCAN algorithm multiple times on an instance
 def fun_multi_dbscan(X, num_customers, model=DBSCAN, prints=False):
 
     # Define hyperparameters for all instance sizes (number of customers):
@@ -366,9 +463,7 @@ def fun_multi_dbscan(X, num_customers, model=DBSCAN, prints=False):
     
     return assignments, core_point_indices
 
-
-
-# Function to compute cluster features and add them to the tsp instance
+# Function to compute cluster features and add them to the instance
 def fun_cluster_features(data, assignments, core_point_indices, features, prints):
 
     ###############################################################################
@@ -510,6 +605,9 @@ def fun_cluster_features(data, assignments, core_point_indices, features, prints
         data.loc[data['Cluster'] == -1, 'Distance To Closest Other Cluster'] = min_distances_to_other_clusters
         data.loc[data['Cluster'] == -1, 'Distance To Closest Other Centroid'] = min_distances_to_other_centroids
     
+    # Add feature 'Cluster Demand' for CVRP
+    if ('Demand' in data.columns): data['Cluster Demand'] = data.groupby('Cluster')['Demand'].transform('sum')
+
     # Turn columns into integers
     data[['Cluster', 'Core Point', 'Outlier', 'Cluster Size']] = data[['Cluster', 'Core Point', 'Outlier', 'Cluster Size']].apply(pd.to_numeric, errors='coerce').astype('Int64')
 
