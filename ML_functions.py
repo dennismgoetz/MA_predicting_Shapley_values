@@ -66,7 +66,7 @@ def fun_fit_tuning(search_method, X_train, y_train, file_name):
     best_params = search_method.best_params_
 
     # Select subfolder and combine the subfolder with the file name to get the folder path
-    subfolder = '02_best_parameters'
+    subfolder = '03_best_parameters'
     os.makedirs(subfolder, exist_ok=True) # Create subfolder if it doesn't exist
     file_path = os.path.join(subfolder, file_name)
 
@@ -80,7 +80,7 @@ def fun_fit_tuning(search_method, X_train, y_train, file_name):
 def fun_load_best_params(file_name):
 
     # Select subfolder and combine the subfolder with the file name to get the folder path
-    subfolder = '02_best_parameters'
+    subfolder = '03_best_parameters'
     file_path = os.path.join(subfolder, file_name)
 
     # Load the file and show the best parameters

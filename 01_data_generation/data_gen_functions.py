@@ -282,7 +282,6 @@ def solve_cvrp(coordinates, demands, capacity):
     )
 
     # Constraints
-
     # Each customer is visited exactly once
     for i in range(1, num_nodes):
         model.addConstr(gp.quicksum(x[i, j] for j in range(num_nodes) if i != j) == 1, name=f'visit_{i}')
@@ -316,7 +315,7 @@ def solve_cvrp(coordinates, demands, capacity):
         for i in range(1, num_nodes):
             if x[0, i].x > 0.5:
                 #print('Route starts at customer', i)
-                sequence = [0,i]
+                sequence = [0, i]
                 
                 # Search for the next customer, always save the sequence, and ensure it's different from the previous one
                 while sequence[-1] != 0:
@@ -371,8 +370,8 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, assignments=No
         mglearn.discrete_scatter(x1=x_coord, x2=y_coord, y=assignments, markers='o')
         cluster_labels = ['Cluster ' + str(int(i)) for i in np.unique(assignments)]
 
-        # DBSCAN: Mark core points in the plot if the parameter 'core_point_indices' is defined
-        if (core_point_indices is not None):
+        # DBSCAN: Mark core points in the plot if the parameter 'core_point_indices' is defined and there is at least one core point
+        if (core_point_indices is not None) and (list(core_point_indices)):
 
             # Get indices of core points
             core_points_mask = np.zeros_like(assignments, dtype=bool) # Create list with same length as assignments containing only zero/False values
@@ -605,8 +604,10 @@ def fun_cluster_features(data, assignments, core_point_indices, features, prints
         data.loc[data['Cluster'] == -1, 'Distance To Closest Other Cluster'] = min_distances_to_other_clusters
         data.loc[data['Cluster'] == -1, 'Distance To Closest Other Centroid'] = min_distances_to_other_centroids
     
-    # Add feature 'Cluster Demand' for CVRP
-    if ('Demand' in data.columns): data['Cluster Demand'] = data.groupby('Cluster')['Demand'].transform('sum')
+    # Add features total demand for each cluster and the proportion of the customers cluster demand for the CVRP
+    if ('Demand' in data.columns):
+        data['Cluster Demand'] = data.groupby('Cluster')['Demand'].transform('sum')
+        data['Cluster Demand Proportion'] =  data['Demand'] / data['Cluster Demand']
 
     # Turn columns into integers
     data[['Cluster', 'Core Point', 'Outlier', 'Cluster Size']] = data[['Cluster', 'Core Point', 'Outlier', 'Cluster Size']].apply(pd.to_numeric, errors='coerce').astype('Int64')
