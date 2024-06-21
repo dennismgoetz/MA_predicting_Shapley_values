@@ -14,11 +14,20 @@ from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error
 # DATASET FUNCTIONS
 ###############################################################################
 # Function to read in data
-def fun_load_file(subfolder_path, name):
+def fun_load_data(routing_problem):
 
-    # Select current working directory and subfolder to load the files
+    # Get the name of the folder and the file to store the final DataFrame
+    if (routing_problem == 'TSP'):
+        folder = '01_TSP'
+        file_name = 'tsp_instances_j_updated.xlsx'
+    elif (routing_problem == 'CVRP'):
+        folder = '02_CVRP'
+        file_name = 'cvrp_instances_j_updated.xlsx'
+
+    # Select current working directory and subfolder to load the file
     current_directory = os.getcwd()
-    file_path = os.path.join(current_directory, subfolder_path, name)
+    subfolder_path = '..\\01_data\\' + folder
+    file_path = os.path.join(current_directory, subfolder_path, file_name)
 
     # Load the file
     return pd.read_excel(io=file_path)

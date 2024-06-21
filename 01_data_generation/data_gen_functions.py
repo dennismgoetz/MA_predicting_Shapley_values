@@ -333,7 +333,7 @@ def solve_cvrp(coordinates, demands, capacity):
         return None, None
 
 # Function to visualize an instance and its optimal solution; additionally you can view cluster assignments of the corresponding model (DBSCAN)
-def plot_instance(coord, sequence, total_costs, x_range, y_range, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
+def plot_instance(coord, sequence, total_costs, x_range, y_range, routing_problem, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
     
     if (print_sequence == True): print('Total costs: {}\nOptimal solution: {}'.format(total_costs, sequence))
 
@@ -347,28 +347,49 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, assignments=No
 
     # Add optimal route with arrows between origin and destination in sequence
     if (plot_sequence == True) & (sequence is not None):
-        for trip in sequence:
-            origin = trip[0]
-            destination = trip[1]
-            x = coord[origin][0]
-            y = coord[origin][1]
-            dx = coord[destination][0] - coord[origin][0]
-            dy = coord[destination][1] - coord[origin][1]
-            plt.arrow(x=x, y=y, dx=dx, dy=dy, head_width=2, head_length=3, 
-                    fc='silver', ec='silver', length_includes_head=True)
+
+        # Get the number depot appearances in the sequence to count the routes and used vehicles (only relevant for CVRP)
+        new_route_starts = np.where([trip[0] == 0 for trip in sequence])[0]
+        num_routes = len(new_route_starts)
+        colors = ['royalblue', 'coral', 'mediumseagreen', 'mediumorchid', 'sienna', 'dimgrey', 'crimson', 'silver', 'hotpink', 'darkcyan']
+
+        # Mark each route of the used vehicles with arrows in another color (first extract the routes inside of the sequence)
+        route_labels = []
+        for index in range(num_routes):
+            if (index != num_routes-1): route = sequence[new_route_starts[index] : new_route_starts[index+1]]
+            if (index == num_routes-1): route = sequence[new_route_starts[index] :]
+
+            # Set the color
+            if (routing_problem == 'TSP'): color = 'silver'
+            elif (routing_problem == 'CVRP'): color = colors[index % len(colors)] # Start with the first color again if there are more routes than colors
+
+            # Add the route label for the legend
+            route_label = f'Route {index + 1}'
+            route_labels.append(route_label)
+            
+            for i, trip in enumerate(route):
+                origin = trip[0]
+                destination = trip[1]
+                x = coord[origin][0]
+                y = coord[origin][1]
+                dx = coord[destination][0] - coord[origin][0]
+                dy = coord[destination][1] - coord[origin][1]
+                plt.arrow(x=x, y=y, dx=dx, dy=dy, head_width=1.5, head_length=1.75, 
+                          fc=color, ec=color, length_includes_head=True, zorder=2, 
+                          label=route_label if i == 0 else '')
 
     # Create scatter plot with depot (black) and customers (blue)
-    plt.scatter(x=depot_coord[0], y=depot_coord[1], color='black', label='Depot', marker='s', s=50)
+    plt.scatter(x=depot_coord[0], y=depot_coord[1], color='crimson', label='Depot', marker='*', s=250, zorder=4)
     if (assignments is None):
-        plt.scatter(x=x_coord, y=y_coord, color='blue', label='Customers', marker='o', s=50, zorder=3)
-
+        plt.scatter(x=x_coord, y=y_coord, color='steelblue', label='Customers', marker='o' if routing_problem == 'TSP' else '.', s=50, zorder=3)
+        cluster_labels = ['Customers']
+    
     # Plot customers according to their cluster assignments if parameter 'assignments' is defined
     if (assignments is not None):
 
-        # Get number of clusters and plot customers according to their cluster assignments
-        K = len(np.unique(assignments))
-        mglearn.discrete_scatter(x1=x_coord, x2=y_coord, y=assignments, markers='o')
+        # Plot customers according to their cluster assignments
         cluster_labels = ['Cluster ' + str(int(i)) for i in np.unique(assignments)]
+        mglearn.discrete_scatter(x1=x_coord, x2=y_coord, y=assignments, markers='o', s=8, labels=cluster_labels)        
 
         # DBSCAN: Mark core points in the plot if the parameter 'core_point_indices' is defined and there is at least one core point
         if (core_point_indices is not None) and (list(core_point_indices)):
@@ -378,30 +399,42 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, assignments=No
             core_points_mask[core_point_indices] = True # Set core point indices to one/True
 
             # Mark core points with a dot and add a label as clarification in the legend
-            mglearn.discrete_scatter(x1=x_coord[core_points_mask], x2=y_coord[core_points_mask], y=assignments[core_points_mask], markers='.', s=5, c='k')
-            last_legend_label = ['Core point']
-
-        else: last_legend_label = [None]
-    else: 
-        cluster_labels = ['Customers']
-        last_legend_label = [None]
-
+            mglearn.discrete_scatter(x1=x_coord[core_points_mask], x2=y_coord[core_points_mask], y=assignments[core_points_mask], markers='.', s=5, c='k', labels=['Core Point'])
+            core_points_label = ['Core Point']
+    
     # Add annotations to identify the customers
     for i in range(len(customer_coord)):
         plt.annotate(text='C' + str(i+1), xy=(x_coord[i], y_coord[i]), textcoords='offset points', xytext=(0, 5), ha='center')
 
-    plt.title('Traveling Salesman Problem', size=16)
+    if (routing_problem == 'TSP'): plt.title('Traveling Salesman Problem', size=16)
+    elif (routing_problem == 'CVRP'): plt.title('Capacitated Vehicle Routing Problem', size=16)
     plt.xlabel('X', fontweight='bold')
     plt.ylabel('Y', fontweight='bold')
     plt.xticks(range(0, x_range[1] + 10, int(x_range[1]/10))) # Adjust x ticks dynamically to the given x_range
     plt.yticks(range(0, y_range[1] + 10, int(x_range[1]/10))) # Adjust y ticks dynamically to the given y_range
     plt.grid(True, zorder=0)
     
-    # Get unique labels and set legend labels dynamically
-    legend_labels = ['Depot'] + cluster_labels + last_legend_label
-    
     # Get handles and labels from all scatter plots and create the legend
     handles, labels = plt.gca().get_legend_handles_labels()
+    
+    # Sort handles (legend symbols) and labels (legend names) to ensure the order 'Depot', 'Customers' / 'Clusters', 'Core Point' 'Route 1/2/3...'
+    depot_index = labels.index('Depot')
+    if (assignments is None):
+        customers_index = labels.index('Customers')
+        handles = [handles[depot_index], handles[customers_index]] + [h for i, h in enumerate(handles) if i not in [depot_index, customers_index]]
+    elif (core_point_indices is not None) and (list(core_point_indices)):
+        customers_index = [labels.index(cluster) for cluster in cluster_labels]
+        core_points_index = labels.index('Core Point')
+        handles = [handles[depot_index]] + [handles[i] for i in customers_index] + [handles[core_points_index]] + [h for i, h in enumerate(handles) if i not in [depot_index, customers_index, core_points_index]]
+    else:
+        customers_index = [labels.index(cluster) for cluster in cluster_labels]
+        handles = [handles[depot_index]] + [handles[i] for i in customers_index] + [h for i, h in enumerate(handles) if i not in [depot_index, customers_index]]
+    
+    # Get unique labels and set legend labels dynamically
+    legend_labels = ['Depot'] + cluster_labels
+    if (core_point_indices is not None) and (list(core_point_indices)): legend_labels += core_points_label
+    if ('route_labels' in locals()): legend_labels += route_labels # Check wheater route_labels is defined
+
     plt.legend(handles, legend_labels, loc='best', bbox_to_anchor=(1.05, 1.0))
     plt.show()
 
