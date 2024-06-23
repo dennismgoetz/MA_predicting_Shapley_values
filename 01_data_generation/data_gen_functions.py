@@ -389,7 +389,7 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, routing_proble
 
         # Plot customers according to their cluster assignments
         cluster_labels = ['Cluster ' + str(int(i)) for i in np.unique(assignments)]
-        mglearn.discrete_scatter(x1=x_coord, x2=y_coord, y=assignments, markers='o', s=8, labels=cluster_labels)        
+        mglearn.discrete_scatter(x1=x_coord, x2=y_coord, y=assignments, markers='o', s=8, labels=cluster_labels)
 
         # DBSCAN: Mark core points in the plot if the parameter 'core_point_indices' is defined and there is at least one core point
         if (core_point_indices is not None) and (list(core_point_indices)):
