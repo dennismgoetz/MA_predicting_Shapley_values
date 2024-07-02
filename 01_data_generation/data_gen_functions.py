@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import mglearn
+from IPython.display import display
 from scipy.spatial.distance import cdist
 import gurobipy as gp
 from gurobipy import GRB
@@ -176,7 +177,9 @@ def fun_shapley_value(player_index, characteristic_function, prints=False):
 
     # Iterate over all possible coalitions/subsets
     for coalition_size in range(1, n + 1):
-        for coalition in itertools.combinations(players, coalition_size):
+        # Create subcoalitions
+        coalitions = itertools.combinations(players, coalition_size)
+        for coalition in coalitions:
 
             # Check wheater player is in subset/coalition
             if player_index in coalition:
@@ -394,12 +397,12 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, routing_proble
         # DBSCAN: Mark core points in the plot if the parameter 'core_point_indices' is defined and there is at least one core point
         if (core_point_indices is not None) and (list(core_point_indices)):
 
-            # Get indices of core points
-            core_points_mask = np.zeros_like(assignments, dtype=bool) # Create list with same length as assignments containing only zero/False values
-            core_points_mask[core_point_indices] = True # Set core point indices to one/True
+            # Get list to selcet core points (e.g. core_point_indices = [0, 1, 2, 4])
+            core_points_mask = np.zeros_like(assignments, dtype=bool) # Create list with same length as assignments containing only zero/False values (e.g. [False False False False False])
+            core_points_mask[core_point_indices] = True # Set core point indices to one/True -> e.g. core_points_mask = [True, True, True, False, True]
 
             # Mark core points with a dot and add a label as clarification in the legend
-            mglearn.discrete_scatter(x1=x_coord[core_points_mask], x2=y_coord[core_points_mask], y=assignments[core_points_mask], markers='.', s=5, c='k', labels=['Core Point'])
+            mglearn.discrete_scatter(x1=x_coord[core_points_mask], x2=y_coord[core_points_mask], markers='.', s=5, c='k', labels=['Core Point'])
             core_points_label = ['Core Point']
     
     # Add annotations to identify the customers
