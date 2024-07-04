@@ -28,10 +28,7 @@ from data_gen_functions import fun_shapley_value, fun_convert_time, fun_save_fil
 # Functions for solving the bin packing problem and computing the Shapley values
 ###############################################################################
 # Function to generate a bin packing instance
-def generate_bin_packing_instance(num_items):
-    # Define bin dimensions
-    bin_weight_capacity = 10
-    bin_size_capacity = 10
+def generate_bin_packing_instance(num_items, bin_weight_capacity=10, bin_size_capacity=10):
 
     # Generate random weights and sizes for items
     w_i = [random.randint(1, 6) for _ in range(num_items)]

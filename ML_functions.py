@@ -6,8 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib_inline
 from IPython.display import display
-import seaborn as sns
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.model_selection import cross_val_score, cross_validate
 from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error
 
@@ -15,19 +13,21 @@ from sklearn.metrics import mean_absolute_percentage_error, mean_squared_error
 # DATASET FUNCTIONS
 ###############################################################################
 # Function to read in data
-def fun_load_data(routing_problem):
+def fun_load_data(optimization_problem):
 
     # Get the name of the folder and the file to store the final DataFrame
-    if (routing_problem == 'TSP'):
-        folder = '01_TSP'
+    if (optimization_problem == 'TSP'):
+        subfolder_path = '..\\01_data\\01_TSP'
         file_name = 'tsp_instances_j_updated.xlsx'
-    elif (routing_problem == 'CVRP'):
-        folder = '02_CVRP'
+    elif (optimization_problem == 'CVRP'):
+        subfolder_path = '..\\01_data\\02_CVRP'
         file_name = 'cvrp_instances_j_updated.xlsx'
+    elif (optimization_problem == 'Bin_Packing'):
+        subfolder_path = '..\\..\\01_data\\03_bin_packing'
+        file_name = 'bin_packing_instances.xlsx'
 
     # Select current working directory and subfolder to load the file
     current_directory = os.getcwd()
-    subfolder_path = '..\\01_data\\' + folder
     file_path = os.path.join(current_directory, subfolder_path, file_name)
 
     # Load the file
@@ -56,14 +56,6 @@ def fun_preprocessing(data):
     y = train_data['Shapley Value']
 
     return X, y, train_data    
-
-# # Function to edit a column in the dataset
-# def fun_edit_data(data, column, column_name, problem='TSP', file_name='combined_train_instances_dennis'):
-#     data[column_name] = column
-#     if (problem == 'TSP'):
-#         data.to_excel('../01_data/01_TSP/' + str(file_name) + '.xlsx')
-#     elif (problem == 'CVRP'):
-#         data.to_excel('../01_data/02_CVRP/' + str(file_name) + '.xlsx')
 
 # Fit a grid search model, measure the fit time and save best parameter combination as into a file
 def fun_fit_tuning(search_method, X_train, y_train, file_name):
@@ -191,8 +183,10 @@ def fun_scores(model, X_train, y_train, cv=5, X_test=None, y_test=None, train_da
             costs_in_X_train = train_data_pred.groupby('Instance ID').apply(lambda X: np.sum(X.loc[[i for i in X.index if i in X_train.index]]['Shapley Value']))
             train_data_pred = pd.merge(left=train_data_pred, right=pd.Series(costs_in_X_train, name='Costs in X_train'), left_on='Instance ID', right_index=True)
 
-            # Compute the remaining costs per instance and the sum of predicted Shapley values
-            train_data_pred['Remaining Costs'] = train_data_pred['Total Costs'] - train_data_pred['Costs in X_train']
+            # Compute the remaining costs per instance and the sum of predicted Shapley values (feature name in TSP and CVRP: 'Total Costs', Bin_Packing: 'Total Bins')
+            if ('Total Costs' in train_data.columns): unit, entities = 'Costs', 'Customers'
+            elif ('Total Bins' in train_data.columns): unit, entities = 'Bins', 'Items'
+            train_data_pred['Remaining Costs'] = train_data_pred['Total ' + unit] - train_data_pred['Costs in X_train']
             train_data_pred['Sum of Predictions'] = train_data_pred.groupby('Instance ID')['Predictions'].transform('sum')
 
             # Compute new predictions in column 'Improved Predictions' and get all predictions in the order of X_test
@@ -215,8 +209,8 @@ def fun_scores(model, X_train, y_train, cv=5, X_test=None, y_test=None, train_da
 
         # Compute error measures for each instance size group individually
         # Group X by instance size and apply for each group the error measure fct. Use indices of each group to select the regarding true y values and the improved predictions in train_data_pred
-        MAPE_cat = X_test.groupby(by='Number Customers').apply(lambda group: mean_absolute_percentage_error(y_true=y_test.loc[group.index], y_pred=train_data_pred.loc[group.index, 'Improved Predictions']))
-        RMSE_cat = X_test.groupby(by='Number Customers').apply(lambda group: mean_squared_error(y_true=y_test.loc[group.index], y_pred=train_data_pred.loc[group.index, 'Improved Predictions'], squared=False))
+        MAPE_cat = X_test.groupby(by='Number ' + entities).apply(lambda group: mean_absolute_percentage_error(y_true=y_test.loc[group.index], y_pred=train_data_pred.loc[group.index, 'Improved Predictions']))
+        RMSE_cat = X_test.groupby(by='Number ' + entities).apply(lambda group: mean_squared_error(y_true=y_test.loc[group.index], y_pred=train_data_pred.loc[group.index, 'Improved Predictions'], squared=False))
 
         # Round restults and merge them into a data frame. Show data frame
         MAPE_cat = np.round(MAPE_cat, 6) * 100
@@ -235,7 +229,7 @@ def fun_scores(model, X_train, y_train, cv=5, X_test=None, y_test=None, train_da
 # FEATURE FUNCTIONS
 ###############################################################################
 # View feature importance of the tree based models
-def plot_feature_weights(model, X_train, n_features):
+def plot_feature_weights(model, n_features):
 
     # Get feature weights
     if (hasattr(model, 'coef_')):

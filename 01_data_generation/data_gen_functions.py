@@ -161,7 +161,7 @@ def fun_shapley_value(player_index, characteristic_function, prints=False):
 
     """
     if (prints == True): 
-        if (player_index == 1): print('\n############### SHAPLEY VALUE ###############')
+        if (player_index == 1): print('\n############### SHAPLEY VALUES ###############')
         print('  - Customer: ' + str(player_index))
 
     # List with highest customer index in all subsets -> take the maximum to get the highest customer index overall
@@ -336,7 +336,7 @@ def solve_cvrp(coordinates, demands, capacity):
         return None, None
 
 # Function to visualize an instance and its optimal solution; additionally you can view cluster assignments of the corresponding model (DBSCAN)
-def plot_instance(coord, sequence, total_costs, x_range, y_range, routing_problem, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
+def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_problem, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
     
     if (print_sequence == True): print('Total costs: {}\nOptimal solution: {}'.format(total_costs, sequence))
 
@@ -363,8 +363,8 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, routing_proble
             if (index == num_routes-1): route = sequence[new_route_starts[index] :]
 
             # Set the color
-            if (routing_problem == 'TSP'): color = 'silver'
-            elif (routing_problem == 'CVRP'): color = colors[index % len(colors)] # Start with the first color again if there are more routes than colors
+            if (optimization_problem == 'TSP'): color = 'silver'
+            elif (optimization_problem == 'CVRP'): color = colors[index % len(colors)] # Start with the first color again if there are more routes than colors
 
             # Add the route label for the legend
             route_label = f'Route {index + 1}'
@@ -384,7 +384,7 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, routing_proble
     # Create scatter plot with depot (black) and customers (blue)
     plt.scatter(x=depot_coord[0], y=depot_coord[1], color='crimson', label='Depot', marker='*', s=250, zorder=4)
     if (assignments is None):
-        plt.scatter(x=x_coord, y=y_coord, color='steelblue', label='Customers', marker='o' if routing_problem == 'TSP' else '.', s=50, zorder=3)
+        plt.scatter(x=x_coord, y=y_coord, color='steelblue', label='Customers', marker='o' if optimization_problem == 'TSP' else '.', s=50, zorder=3)
         cluster_labels = ['Customers']
     
     # Plot customers according to their cluster assignments if parameter 'assignments' is defined
@@ -409,8 +409,8 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, routing_proble
     for i in range(len(customer_coord)):
         plt.annotate(text='C' + str(i+1), xy=(x_coord[i], y_coord[i]), textcoords='offset points', xytext=(0, 5), ha='center')
 
-    if (routing_problem == 'TSP'): plt.title('Traveling Salesman Problem', size=16)
-    elif (routing_problem == 'CVRP'): plt.title('Capacitated Vehicle Routing Problem', size=16)
+    if (optimization_problem == 'TSP'): plt.title('Traveling Salesman Problem', size=16)
+    elif (optimization_problem == 'CVRP'): plt.title('Capacitated Vehicle Routing Problem', size=16)
     plt.xlabel('X', fontweight='bold')
     plt.ylabel('Y', fontweight='bold')
     plt.xticks(range(0, x_range[1] + 10, int(x_range[1]/10))) # Adjust x ticks dynamically to the given x_range
