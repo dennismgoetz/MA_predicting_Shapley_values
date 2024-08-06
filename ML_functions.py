@@ -64,15 +64,24 @@ def fun_fit_tuning(search_method, X_train, y_train, file_name):
     search_method.fit(X_train, y_train)
     fit_time = fun_convert_time(start=start, end=time.time())
 
+    # Get param grid or param distribution
+    if hasattr(search_method, 'param_grid'): param_grid = search_method.param_grid
+    elif hasattr(search_method, 'param_distributions'): param_grid = search_method.param_distributions
+
     # Get best parameter combination
     best_params = search_method.best_params_
 
     # Select subfolder and combine the subfolder with the file name to get the folder path
     subfolder = '03_best_parameters'
     os.makedirs(subfolder, exist_ok=True) # Create subfolder if it doesn't exist
-    file_path = os.path.join(subfolder, file_name)
+
+    # Save the parameter grid/distribution
+    file_path = os.path.join(subfolder, file_name + '_param_grid.pkl')
+    with open(file_path, 'wb') as file:
+        pickle.dump(param_grid, file)
 
     # Save the best parameters to a file
+    file_path = os.path.join(subfolder, file_name + '_best_params.pkl')
     with open(file_path, 'wb') as file:
         pickle.dump(best_params, file)
 
