@@ -24,7 +24,7 @@ def fun_load_data(optimization_problem):
         file_name = 'cvrp_instances_j_updated.xlsx'
     elif (optimization_problem == 'Bin_Packing'):
         subfolder_path = '..\\..\\01_data\\03_bin_packing'
-        file_name = 'bin_packing_instances.xlsx'
+        file_name = 'bin_packing_instances_j_updated.xlsx'
 
     # Select current working directory and subfolder to load the file
     current_directory = os.getcwd()
@@ -35,7 +35,6 @@ def fun_load_data(optimization_problem):
 
 # Function to save data as excel sheet
 def fun_save_file(data, subfolder_path, name):
-
     # Select current working directory and subfolder to load the files
     current_directory = os.getcwd()
     file_path = os.path.join(current_directory, subfolder_path, name)
@@ -47,9 +46,17 @@ def fun_save_file(data, subfolder_path, name):
 def fun_preprocessing(data):
     # Select columns
     columns = [i for i in data.columns]
-    extracted_features = ['Unnamed: 0.1', 'Unnamed: 0', 'Shapley Value Cluster', 'SHAPO', 'Percentage_error', 'Percentage Error']
-    train_features = [i for i in columns if i not in extracted_features]
-    train_data = data[train_features]
+    extracted_features = ['Unnamed: 0.1', 'Unnamed: 0', 'Shapley Value Cluster', 'SHAPO', 'Percentage_error', 'Percentage Error',
+                          'Outlier', 'Core Point', 'Number Outliers', 'Centroid Distance Ratio', 'Distance To Closest Other Centroid Ratio', 
+                          'X Mean', 'Y Mean',
+                          'Instance_id', '25% Percentile Size Ratio', '50% Percentile Size Ratio', '75% Percentile Size Ratio', '100% Percentile Size Ratio']
+    columns = [i for i in columns if i not in extracted_features]
+
+    # Remove all features on which a ratio feature is based (e.g. remove 'Depot Distance' and keep 'Depot Distance Ratio')
+    ratio_features = [i for i in columns if 'Ratio' in i] # Get all ratio features
+    all_other_features = [i for i in columns if i not in ratio_features] # Remove only the ratio features
+    columns = [i if (i + ' Ratio' not in ratio_features) else i + ' Ratio' for i in all_other_features] # Replace the basic features with the ratio features
+    train_data = data[columns]
 
     # Split X and y
     X = train_data[[i for i in train_data.columns if not i == 'Shapley Value']]
@@ -57,12 +64,13 @@ def fun_preprocessing(data):
 
     return X, y, train_data    
 
-# Fit a grid search model, measure the fit time and save best parameter combination as into a file
+# Fit a grid search model, measure the fit time and save best parameter combination into a file
 def fun_fit_tuning(search_method, X_train, y_train, file_name):
     # Fit the model on the train data and measure the time
     start = time.time()
     search_method.fit(X_train, y_train)
     fit_time = fun_convert_time(start=start, end=time.time())
+    print('Tuning fit time:', fit_time)
 
     # Get param grid or param distribution
     if hasattr(search_method, 'param_grid'): param_grid = search_method.param_grid
@@ -128,110 +136,169 @@ def fun_convert_time(start=None, end=None, seconds=None):
 
 
 ###############################################################################
-# SCORING FUNCTION
+# SCALING FUNCTIONS
+###############################################################################
+# Function to compute the scaled MAPE  in a CV process
+# (Scale the predictions, such that the sum of all predicitons per instance is equal to the sum of the Shapley values of that instance)
+def fun_scaled_neg_MAPE(estimator, X, y_true):
+    # Make predictions
+    y_pred = estimator.predict(X)
+    
+    # Connect the X_predict Data Frame with the true y labels of y_true; then assighn the predictions as a columns to the Data Frame
+    Xy_train = pd.merge(left=X, right=y_true, left_index=True, right_index=True)
+    Xy_train_pred = Xy_train.assign(Predictions=pd.Series(data=y_pred, index=X.index))
+    
+    # Compute the sum of predicted Shapley values and the sum of true Shapley values (the sum of the predicted Shapley values should be equal to the total costs/sum of all Shapley values of an instance)
+    Xy_train_pred['Sum of Predictions'] = Xy_train_pred.groupby('Instance ID')['Predictions'].transform('sum')
+    Xy_train_pred['Sum of Costs (Shapley values)'] = Xy_train_pred.groupby('Instance ID')['Shapley Value'].transform('sum')
+    
+    # Compute new predictions
+    y_pred = Xy_train_pred['Predictions'] * (Xy_train_pred['Sum of Costs (Shapley values)'] / Xy_train_pred['Sum of Predictions'])
+
+    return - np.mean(np.abs((y_true - y_pred) / y_true))
+
+# Function to compute the scaled RMSE in a CV process
+def fun_scaled_neg_RMSE(estimator, X, y_true):
+    # Make predictions
+    y_pred = estimator.predict(X)
+    
+    # Connect the X_predict Data Frame with the true y labels of y_true; then assighn the predictions as a columns to the Data Frame
+    Xy_train = pd.merge(left=X, right=y_true, left_index=True, right_index=True)
+    Xy_train_pred = Xy_train.assign(Predictions=pd.Series(data=y_pred, index=X.index))
+    
+    # Compute the sum of predicted Shapley values and the sum of true Shapley values (the sum of the predicted Shapley values should be equal to the total costs/sum of all Shapley values of an instance)
+    Xy_train_pred['Sum of Predictions'] = Xy_train_pred.groupby('Instance ID')['Predictions'].transform('sum')
+    Xy_train_pred['Sum of Costs (Shapley values)'] = Xy_train_pred.groupby('Instance ID')['Shapley Value'].transform('sum')
+    
+    # Compute new predictions
+    y_pred = Xy_train_pred['Predictions'] * (Xy_train_pred['Sum of Costs (Shapley values)'] / Xy_train_pred['Sum of Predictions'])
+
+    return - np.sqrt(np.mean((y_true - y_pred)**2))
+
+# Function make predictions with a model, scale the predictions and compute the MAPE and RMSE for the train or test set
+def fun_predict_with_scaling(model, X_train, y_train, X_predict, y_true, apply_scaling):
+    
+    # Fit model on train data and get predictions for X_predict (X_predict usually is X_test, but the prediction for X_train is also possible to get the train score)
+    try: # If the model is already fitted (e.g. a grid search model after the tuning), you can directly make the predictions
+        y_pred = model.predict(X_predict)
+        fit_time = None
+    except:
+        start = time.time()
+        model.fit(X_train, y_train)
+        y_pred = model.predict(X_predict)
+        fit_time = fun_convert_time(start=start, end=time.time())
+    
+    # Improve predictions: Sum of predicted Shapley values must be equal to the total costs for all instances
+    if (apply_scaling == True):
+        
+        # Connect the X_predict Data Frame with the true y labels of y_true; then assighn the predictions as a columns to the Data Frame
+        Xy_train = pd.merge(left=X_predict, right=y_true, left_index=True, right_index=True)
+        Xy_train_pred = Xy_train.assign(Predictions=pd.Series(data=y_pred, index=X_predict.index))
+        
+        # Compute the sum of predicted Shapley values and the sum of true Shapley values (the sum of the predicted Shapley values should be equal to the total costs/sum of all Shapley values of an instance)
+        Xy_train_pred['Sum of Predictions'] = Xy_train_pred.groupby('Instance ID')['Predictions'].transform('sum')
+        Xy_train_pred['Sum of Costs (Shapley values)'] = Xy_train_pred.groupby('Instance ID')['Shapley Value'].transform('sum')
+        
+        # Compute new predictions in column 'Improved Predictions' and get all predictions as a pd.Series; optionally view the Data Frame Xy_train_pred
+        Xy_train_pred['Improved Predictions'] = Xy_train_pred['Predictions'] * (Xy_train_pred['Sum of Costs (Shapley values)'] / Xy_train_pred['Sum of Predictions'])
+        y_pred = Xy_train_pred['Improved Predictions']
+        #display(Xy_train_pred[['Instance ID', 'Number Customers', 'Total Costs', 'Sum of Costs (Shapley values)', 'Predictions', 'Sum of Predictions', 'Improved Predictions', 'Shapley Value']].sort_index().head(12))
+    
+    # If the scaling is not applied, just add the correct indices to the predictions for the categorical scores later on
+    else: y_pred = pd.Series(data=y_pred, index=X_predict.index)
+
+    # Compute errors
+    MAPE_score = np.round(mean_absolute_percentage_error(y_true=y_true, y_pred=y_pred), 6) * 100
+    RMSE_score = np.round(mean_squared_error(y_true=y_true, y_pred=y_pred, squared=False), 4)
+
+    return MAPE_score, RMSE_score, y_pred, fit_time
+
+
+
+###############################################################################
+# SCORING FUNCTIONS
 ###############################################################################
 # Function to view grid search CV scores of all parameter combinations
 def fun_tuning_results(search_method, search_space):
     # Turn results into a data frame and modify the 'mean_fit_time' column for better understanding
     results_df = pd.DataFrame(search_method.cv_results_).sort_values(by='mean_test_score', ascending=False).reset_index(drop=True)
     results_df['converted_mean_fit_time'] = results_df['mean_fit_time'].apply(lambda X: fun_convert_time(seconds=X))
-
-    # Select all the parameter columns that appear in the grid search as well as the test score and fit time
+    
+    # Display multiple Data Frames if the results_df has too many rows (max is 60 rows for displaying all rows)
     print('Cross validation scores of different parameter combinations:')
-    display(results_df[['param_' + i for i in list(search_space.keys())] + ['mean_test_score', 'converted_mean_fit_time']])
+    if len(results_df) > 60:
+        for i in range((len(results_df) // 60) + 1):
+            start = i * 60
+            end = start + 59
+            # Select all the parameter columns that appear in the grid search as well as the test score and fit time
+            display(results_df[['param_' + i for i in list(search_space.keys())] + ['mean_test_score', 'converted_mean_fit_time']].loc[start:end])
     return results_df
 
 # Compute train and test scores
-def fun_scores(model, X_train, y_train, cv=5, X_test=None, y_test=None, train_data=None):
+def fun_scores(model, X_train, y_train, X_test=None, y_test=None, apply_scaling=True, compute_test_scores=False):
 
     # Get CV train scores of a grid search model
     if (hasattr(model, 'best_score_')):
-        MAPE = - np.round(model.best_score_, 6) * 100
-        RMSE = np.round(mean_squared_error(y_true=y_train, y_pred=model.predict(X_train), squared=False), 4)
+        MAPE_train = - np.round(model.best_score_, 6) * 100
+        RMSE_train, cv_computation_time = None, None
+        print('CV MAPE (scaled) train data:  {} %'.format(MAPE_train)) 
         
-        # Print train scores
-        print('CV MAPE train data:  {} %'.format(MAPE))
-        print('CV RMSE train data: ', RMSE)
-
         # Show best parameter combination
         print('\nBest model / parameter combination:')
         if (len(model.get_params()) <= 10): display(model.best_estimator_)
         else: display(model.best_params_)
 
-        return {'MAPE': MAPE, 'RMSE': RMSE}
-
     # Compute CV train scores if model is a usual estimator and measure CV computation time
     else:
+        # Get MAPE and RMSE scores from the model's scaled predictions and unscaled predictions
         start = time.time()
-        cv_scores = cross_validate(estimator=model, X=X_train, y=y_train, cv=cv,
-                                   scoring=['neg_mean_absolute_percentage_error', 'neg_root_mean_squared_error'],
-                                   n_jobs=-1, verbose=False)
-        cv_time = fun_convert_time(start=start, end=time.time())
+        cv_scores = cross_validate(estimator=model, X=X_train, y=y_train, cv=3, n_jobs=-1,
+                                   scoring={'scaled_mape': fun_scaled_neg_MAPE,
+                                            'scaled_rmse': fun_scaled_neg_RMSE,
+                                            'original_neg_mape': 'neg_mean_absolute_percentage_error',
+                                            'original_neg_rmse': 'neg_root_mean_squared_error'})
+        cv_computation_time = fun_convert_time(start=start, end=time.time())
 
-        MAPE = - np.round(cv_scores['test_neg_mean_absolute_percentage_error'].mean(), 6) * 100
-        RMSE = - np.round(cv_scores['test_neg_root_mean_squared_error'].mean(), 4)
-
-        # Print train scores
-        print('CV MAPE train data:  {} %'.format(MAPE))
-        print('CV RMSE train data: ', RMSE)
-        print('CV computation time:', cv_time)
+        # Print train scores for either the scaled predictions or the unscaled predictions
+        if (apply_scaling == True):
+            MAPE_train = - np.round(cv_scores['test_scaled_mape'].mean(), 6) * 100
+            RMSE_train = - np.round(cv_scores['test_scaled_rmse'].mean(), 4)
+        else:
+            MAPE_train = - np.round(cv_scores['test_original_neg_mape'].mean(), 6) * 100
+            RMSE_train = - np.round(cv_scores['test_original_neg_rmse'].mean(), 4)
+        print('CV MAPE ({}) train data:  {} %'.format('scaled' if apply_scaling else 'original', MAPE_train))
+        print('CV RMSE ({}) train data: {}'.format('scaled' if apply_scaling else 'original', RMSE_train))        
+        print('CV computation time:', cv_computation_time)
     
-    # Compute test scores if test set is given
-    if (X_test is not None) & (y_test is not None):
-
-        # Fit model on train data and get predictions for test set
-        model.fit(X_train, y_train)
-        pred = model.predict(X_test)
-
-        # Improve predictions: Sum of predicted Shapley values must be equal to the total costs for all instances
-        if (train_data is not None):
-            # Assign the predictions to the train_data data frame, which contains all instances and customers with all features and the true Shapley values
-            train_data_pred = train_data.assign(Predictions=pd.Series(data=pred, index=X_test.index))
-
-            # Sum up all Shapley values (costs) in the train set (X_train) of each instance to compute the remaining costs, which should be equal to the sum of predictions
-            costs_in_X_train = train_data_pred.groupby('Instance ID').apply(lambda X: np.sum(X.loc[[i for i in X.index if i in X_train.index]]['Shapley Value']))
-            train_data_pred = pd.merge(left=train_data_pred, right=pd.Series(costs_in_X_train, name='Costs in X_train'), left_on='Instance ID', right_index=True)
-
-            # Compute the remaining costs per instance and the sum of predicted Shapley values (feature name in TSP and CVRP: 'Total Costs', Bin_Packing: 'Total Bins')
-            if ('Total Costs' in train_data.columns): unit, entities = 'Costs', 'Customers'
-            elif ('Total Bins' in train_data.columns): unit, entities = 'Bins', 'Items'
-            train_data_pred['Remaining Costs'] = train_data_pred['Total ' + unit] - train_data_pred['Costs in X_train']
-            train_data_pred['Sum of Predictions'] = train_data_pred.groupby('Instance ID')['Predictions'].transform('sum')
-
-            # Compute new predictions in column 'Improved Predictions' and get all predictions in the order of X_test
-            train_data_pred['Improved Predictions'] = train_data_pred['Predictions'] * (train_data_pred['Remaining Costs'] / train_data_pred['Sum of Predictions'])
-            #display(train_data_pred[['Instance ID', 'Number Customers', 'Total Costs', 'Costs in X_train', 'Remaining Costs', 'Predictions', 'Sum of Predictions', 'Improved Predictions', 'Shapley Value']])
-            pred = pd.Series(data=train_data_pred['Improved Predictions'].dropna(), index=X_test.index)
-
-        # Compute errors
-        MAPE_test = np.round(mean_absolute_percentage_error(y_true=y_test, y_pred=pred), 6) * 100
-        RMSE_test = np.round(mean_squared_error(y_true=y_test, y_pred=pred, squared=False), 4)
-
-        # Update scores
-        MAPE_train, RMSE_train = MAPE, RMSE
+    # Compute test scores if compute_test_scores == True
+    if (compute_test_scores == True):
+        if (X_test is None) or (y_test is None): raise ValueError("You need to define X_test and y_test to compute the test scores.")
+        # Get MAPE and RMSE scores from the model's scaled predictions and update scores
+        MAPE_test, RMSE_test, y_pred, fit_time = fun_predict_with_scaling(model, X_train, y_train, X_test, y_test, apply_scaling)
         MAPE = {'Train data': MAPE_train, 'Test data': MAPE_test}
         RMSE = {'Train data': RMSE_train, 'Test data': RMSE_test}
 
-        # Print test scores
-        print('\nMAPE test data: {} %'.format(MAPE_test))
-        print('RMSE test data: {}'.format(RMSE_test))
-
         # Compute error measures for each instance size group individually
-        # Group X by instance size and apply for each group the error measure fct. Use indices of each group to select the regarding true y values and the improved predictions in train_data_pred
-        MAPE_cat = X_test.groupby(by='Number ' + entities).apply(lambda group: mean_absolute_percentage_error(y_true=y_test.loc[group.index], y_pred=train_data_pred.loc[group.index, 'Improved Predictions']))
-        RMSE_cat = X_test.groupby(by='Number ' + entities).apply(lambda group: mean_squared_error(y_true=y_test.loc[group.index], y_pred=train_data_pred.loc[group.index, 'Improved Predictions'], squared=False))
+        # Group X by instance size and apply for each group the error measure fct. Use indices of each group to select the regarding true y values and the improved predictions
+        entities = 'Customers' if ('Number Customers' in X_train.columns) else 'Items' # Feature name in TSP and CVRP: 'Number Customers', Bin_Packing: 'Number Items'
+        MAPE_cat = X_test.groupby(by='Number ' + entities).apply(lambda group: mean_absolute_percentage_error(y_true=y_test.loc[group.index], y_pred=y_pred.loc[group.index]))
+        RMSE_cat = X_test.groupby(by='Number ' + entities).apply(lambda group: mean_squared_error(y_true=y_test.loc[group.index], y_pred=y_pred.loc[group.index], squared=False))
 
-        # Round restults and merge them into a data frame. Show data frame
+        # Round results and merge them into a data frame
         MAPE_cat = np.round(MAPE_cat, 6) * 100
         RMSE_cat = np.round(RMSE_cat, 4)
         df = pd.DataFrame(data=[MAPE_cat, RMSE_cat], index=['MAPE', 'RMSE'])
         df['Mean'] = [MAPE_test, RMSE_test]
+
+        # Print results and show data frame of instance size groups
+        print('\nMAPE ({}) test data:  {} %'.format('scaled' if apply_scaling else 'original', MAPE_test))
+        print('RMSE ({}) test data: {}'.format('scaled' if apply_scaling else 'original', RMSE_test))
+        if (fit_time is not None): print('Model fit time:', fit_time)
         print('\nMAPE and RMSE on test data per instance size:'), display(df)
 
-        return {'MAPE': MAPE, 'RMSE': RMSE, 'CV computation time': cv_time, 'Scores per instance size': df}
+        return {'MAPE': MAPE, 'RMSE': RMSE, 'CV computation time': cv_computation_time, 'Fit model time': fit_time, 'Scores per instance size': df}
 
-    else: return {'MAPE': MAPE, 'RMSE': RMSE, 'CV computation time': cv_time}
-
+    else: return {'MAPE': MAPE_train, 'RMSE': RMSE_train, 'CV computation time': cv_computation_time}
 
 
 ###############################################################################
