@@ -44,21 +44,30 @@ def fun_save_file(data, subfolder_path, name):
 
 # Select columns for training and split dataset into features and target (shapley value)
 def fun_preprocessing(data):
-    # Select columns
-    columns = [i for i in data.columns]
-    extracted_features = ['Unnamed: 0.1', 'Unnamed: 0', 'Shapley Value Cluster', 'SHAPO', 'Percentage_error', 'Percentage Error',
-                          'Outlier', 'Core Point', 'Number Outliers', 'Centroid Distance Ratio', 'Distance To Closest Other Centroid Ratio', 
-                          'X Mean', 'Y Mean',
-                          'Instance_id', '25% Percentile Size Ratio', '50% Percentile Size Ratio', '75% Percentile Size Ratio', '100% Percentile Size Ratio']
-    columns = [i for i in columns if i not in extracted_features]
 
     # Remove all features on which a ratio feature is based (e.g. remove 'Depot Distance' and keep 'Depot Distance Ratio')
+    columns = [i for i in data.columns]
     ratio_features = [i for i in columns if 'Ratio' in i] # Get all ratio features
     all_other_features = [i for i in columns if i not in ratio_features] # Remove only the ratio features
     columns = [i if (i + ' Ratio' not in ratio_features) else i + ' Ratio' for i in all_other_features] # Replace the basic features with the ratio features
-    train_data = data[columns]
 
-    # Split X and y
+    # Remove the extracted features
+    extracted_features_tsp = ['Unnamed: 0.1', 'Unnamed: 0', 'Shapley Value Cluster', 'SHAPO', 'Percentage_error', 'Percentage Error',
+                              'Outlier', 'Core Point', 'Number Outliers', 'Centroid Distance Ratio', 'Distance To Closest Other Centroid Ratio', 
+                              'X Mean', 'Y Mean', '9th CCD Ratio', '10th CCD Ratio']
+    extracted_features_bin_packing = ['Instance_id', '0% Percentile Weight', '100% Percentile Weight', '0% Percentile Size', '100% Percentile Size',
+                                      'Weight / 0% Percentile Ratio', 'Weight / 100% Percentile Ratio', 'Size / 0% Percentile Ratio', 'Size / 100% Percentile Ratio',
+                                      'Weight Mean', 'Size Mean',
+                                      'Item Bin Utilization Weight Ratio', 'Item Bin Utilization Size Ratio', 'Weight Bin Combinations Ratio', 'Size Bin Combinations Ratio',
+                                      'Weight Quantile Values Ratio', 'Size Quantile Values Ratio', '25% Percentile Weight', '50% Percentile Weight', '75% Percentile Weight',
+                                      '25% Percentile Size', '50% Percentile Size', '75% Percentile Size', 'Weight / 25% Percentile Ratio', 'Weight / 50% Percentile Ratio',
+                                      'Weight / 75% Percentile Ratio', 'Size / 25% Percentile Ratio', 'Size / 50% Percentile Ratio', 'Size / 75% Percentile Ratio']
+                                    #'25% Percentile Size Ratio', '50% Percentile Size Ratio', '75% Percentile Size Ratio', '100% Percentile Size Ratio' # These columns were deleted from the original bin packing Data Frame
+    extracted_features = extracted_features_tsp + extracted_features_bin_packing
+    columns = [i for i in columns if i not in extracted_features]
+    
+    # Select columns and split X and y
+    train_data = data[columns]
     X = train_data[[i for i in train_data.columns if not i == 'Shapley Value']]
     y = train_data['Shapley Value']
 
