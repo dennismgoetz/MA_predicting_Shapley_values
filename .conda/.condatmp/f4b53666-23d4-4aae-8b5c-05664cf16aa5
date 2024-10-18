@@ -1,0 +1,13 @@
+prefix=c:/Users/dennis/OneDrive - ku.de/Dokumente/03_Master/07_Masterarbeit/05_Code/02_github/.conda/Library
+exec_prefix=c:/Users/dennis/OneDrive - ku.de/Dokumente/03_Master/07_Masterarbeit/05_Code/02_github/.conda/Library
+libdir=c:/Users/dennis/OneDrive - ku.de/Dokumente/03_Master/07_Masterarbeit/05_Code/02_github/.conda/Library/lib
+sharedlibdir=c:/Users/dennis/OneDrive - ku.de/Dokumente/03_Master/07_Masterarbeit/05_Code/02_github/.conda/Library/lib
+includedir=c:/Users/dennis/OneDrive - ku.de/Dokumente/03_Master/07_Masterarbeit/05_Code/02_github/.conda/Library/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.2.13
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}

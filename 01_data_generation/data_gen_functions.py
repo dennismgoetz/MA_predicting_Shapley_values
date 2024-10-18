@@ -2,7 +2,6 @@
 # Import packages
 ###############################################################################
 import os
-import time
 import random 
 import pandas as pd
 import numpy as np
@@ -45,12 +44,12 @@ def generate_tsp_instance(num_customers, x_range, y_range):
     for _ in range(num_customers):
         x = random.uniform(x_range[0], x_range[1])
         y = random.uniform(y_range[0], y_range[1])
-        customer_data.append({'X': x, 'Y': y}) # List with dictionaries. One for each customer with X and Y coordinate
+        customer_data.append({"X": x, "Y": y}) # List with dictionaries. One for each customer with X and Y coordinate
 
     # Generate random X and Y coordinates for the depot
     x_depot = random.uniform(x_range[0], x_range[1])
     y_depot = random.uniform(y_range[0], y_range[1])
-    depot_data = {'X': x_depot, 'Y': y_depot}
+    depot_data = {"X": x_depot, "Y": y_depot}
 
     # Insert the depot data at the beginning of the list
     customer_data.insert(0, depot_data)
@@ -63,7 +62,7 @@ def generate_tsp_instance(num_customers, x_range, y_range):
 # Function to generate a CVRP instance
 def generate_cvrp_instance(num_customers, x_range, y_range, demand_min, demand_max, capacity_min, capacity_max):
     # Create a DataFrame to store customer locations
-    columns = ['X', 'Y', 'Vehicle Capacity', 'Demand']
+    columns = ["X", "Y", "Vehicle Capacity", "Demand"]
     customer_locations = pd.DataFrame(columns=columns)
     capacity = random.randint(capacity_min, capacity_max)
 
@@ -79,11 +78,11 @@ def generate_cvrp_instance(num_customers, x_range, y_range, demand_min, demand_m
     # Insert the depot in the first row
     x_depot = random.uniform(x_range[0], x_range[1])
     y_depot = random.uniform(y_range[0], y_range[1])
-    depot = pd.DataFrame({'X': [x_depot], 'Y': [y_depot], 'Vehicle Capacity': capacity, 'Demand': 0})
+    depot = pd.DataFrame({"X": [x_depot], "Y": [y_depot], "Vehicle Capacity": capacity, "Demand": 0})
     customer_locations = pd.concat([depot, customer_locations]).reset_index(drop=True)
     
     # Add total deamand
-    customer_locations['Total Demand'] = customer_locations['Demand'].sum()
+    customer_locations["Total Demand"] = customer_locations["Demand"].sum()
 
     return customer_locations
 
@@ -95,19 +94,19 @@ def distance(coord1, coord2):
 def fun_convert_time(start=None, end=None, seconds=None):
     if(seconds is None): seconds = int(end - start)
     if seconds < 60: # Less than a minute
-        computation_time = f'{int(seconds)}s'
+        computation_time = f"{int(seconds)}s"
     elif seconds < 3600: # Less than an hour (60 * 60 = 3600)
         minutes = seconds // 60
         remaining_seconds = (seconds % 60)
-        computation_time = f'{int(minutes)}m, {int(remaining_seconds)}s'
+        computation_time = f"{int(minutes)}m, {int(remaining_seconds)}s"
     elif seconds < 86400: # Less than a day (60 * 60 * 24 = 86400)
         hours = seconds // 3600
         remaining_minutes = (seconds % 3600) // 60
-        computation_time = f'{int(hours)}h, {int(remaining_minutes)}m'
+        computation_time = f"{int(hours)}h, {int(remaining_minutes)}m"
     else: # More than a day
         days = seconds // 86400
         remaining_hours = (seconds % 86400) // 3600
-        computation_time = f'{int(days)}d, {int(remaining_hours)}h'
+        computation_time = f"{int(days)}d, {int(remaining_hours)}h"
     return computation_time
 
 # Function to save data as excel sheet
@@ -120,7 +119,7 @@ def fun_save_file(data, subfolder_path, name):
     # Save the file
     data.to_excel(file_path)
     
-    return print('File saved successfully!')
+    return print("File saved successfully!")
 
 # Function to read in data
 def fun_load_file(subfolder_path, name):
@@ -161,15 +160,15 @@ def fun_shapley_value(player_index, characteristic_function, prints=False):
 
     """
     if (prints == True): 
-        if (player_index == 1): print('\n############### SHAPLEY VALUES ###############')
-        print('  - Customer: ' + str(player_index))
+        if (player_index == 1): print("\n############### SHAPLEY VALUES ###############")
+        print("  - Customer: " + str(player_index))
 
     # List with highest customer index in all subsets -> take the maximum to get the highest customer index overall
     n = max(max(coalition) for coalition in characteristic_function.keys())
     
     # Check wheater customer/player index is valid
     if (player_index < 1) or (player_index > n):
-        raise ValueError('Player index is out of bounds')
+        raise ValueError("Player index is out of bounds")
     
     # List with all customer/player indices
     players = list(range(1, n + 1))
@@ -185,29 +184,29 @@ def fun_shapley_value(player_index, characteristic_function, prints=False):
             if player_index in coalition:
                 # Get total costs of subset with subset as key; if key is not in the dictionary return 0
                 coalition_value = characteristic_function.get(coalition, 0)
-                if (prints == True): print('      Subset: {}, Total costs: {}'.format(coalition, coalition_value))
+                if (prints == True): print("      Subset: {}, Total costs: {}".format(coalition, coalition_value))
 
                 # Get the total costs of the subset without the player customer/player
                 coalition_without_i = set(coalition) - {player_index}
                 prev_coalition_value = characteristic_function.get(tuple(sorted(coalition_without_i)), 0)
-                if (prints == True): print('        Subset without customer: {}, Total costs: {}'.format(coalition_without_i, prev_coalition_value))
+                if (prints == True): print("        Subset without customer: {}, Total costs: {}".format(coalition_without_i, prev_coalition_value))
 
                 # Compute marginal costs of customer/player in the subset
                 marginal_contribution = coalition_value - prev_coalition_value
-                if (prints == True): print('        Marginal contribution: {} - {} = {}'.format(coalition_value, prev_coalition_value, marginal_contribution))
+                if (prints == True): print("        Marginal contribution: {} - {} = {}".format(coalition_value, prev_coalition_value, marginal_contribution))
                 
                 # Shapley value formula
                 num_possible_orders = (math.factorial(coalition_size - 1) * math.factorial(n - coalition_size))
                 shapley_value += marginal_contribution * (num_possible_orders / math.factorial(n))
 
-    if (prints == True): print('   Shapley value: {}\n'.format(shapley_value))
+    if (prints == True): print("   Shapley value: {}\n".format(shapley_value))
     
     return shapley_value
 
 # Function to solve TSP with Gurobi
 def solve_tsp(coordinates):
     # Create a Gurobi model
-    model = gp.Model('TSP')
+    model = gp.Model("TSP")
 
     # Get the number of coordinates
     num_coordinates = len(coordinates)
@@ -217,7 +216,7 @@ def solve_tsp(coordinates):
     for i in range(num_coordinates):
         for j in range(num_coordinates):
             if i != j:
-                x[i, j] = model.addVar(vtype=gp.GRB.BINARY, name=f'x_{i}_{j}')
+                x[i, j] = model.addVar(vtype=gp.GRB.BINARY, name=f"x_{i}_{j}")
 
     # Define the objective function (minimize the total distance)
     model.setObjective(
@@ -228,11 +227,11 @@ def solve_tsp(coordinates):
 
     # Add constraints to ensure that each coordinate is visited exactly once
     for i in range(num_coordinates):
-        model.addConstr(gp.quicksum(x[i, j] for j in range(num_coordinates) if i != j) == 1, name=f'visit_{i}')
+        model.addConstr(gp.quicksum(x[i, j] for j in range(num_coordinates) if i != j) == 1, name=f"visit_{i}")
 
     # Add constraints to ensure that each coordinate is left exactly once
     for j in range(num_coordinates):
-        model.addConstr(gp.quicksum(x[i, j] for i in range(num_coordinates) if i != j) == 1, name=f'leave_{j}')
+        model.addConstr(gp.quicksum(x[i, j] for i in range(num_coordinates) if i != j) == 1, name=f"leave_{j}")
 
     # Add subtour elimination constraints based on cardinality
     for size in range(2, num_coordinates):
@@ -259,19 +258,19 @@ def solve_cvrp(coordinates, demands, capacity):
     num_nodes = len(coordinates)
 
     # Create a Gurobi model
-    model = gp.Model('CVRP')
+    model = gp.Model("CVRP")
 
     # Decision variables
     x = {}
     for i in range(num_nodes):
         for j in range(num_nodes):
             if i != j:
-                x[i, j] = model.addVar(vtype=gp.GRB.BINARY, name=f'x_{i}_{j}')
+                x[i, j] = model.addVar(vtype=gp.GRB.BINARY, name=f"x_{i}_{j}")
 
     # Vehicle flow variables
     u = {}
     for i in range(1, num_nodes):
-        u[i] = model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0.0, name=f'u_{i}')
+        u[i] = model.addVar(vtype=gp.GRB.CONTINUOUS, lb=0.0, name=f"u_{i}")
 
     model.update()
 
@@ -287,16 +286,16 @@ def solve_cvrp(coordinates, demands, capacity):
     # Constraints
     # Each customer is visited exactly once
     for i in range(1, num_nodes):
-        model.addConstr(gp.quicksum(x[i, j] for j in range(num_nodes) if i != j) == 1, name=f'visit_{i}')
+        model.addConstr(gp.quicksum(x[i, j] for j in range(num_nodes) if i != j) == 1, name=f"visit_{i}")
 
     # Each customer is left exactly once
     for j in range(1, num_nodes):
-        model.addConstr(gp.quicksum(x[i, j] for i in range(num_nodes) if i != j) == 1, name=f'leave_{j}')
+        model.addConstr(gp.quicksum(x[i, j] for i in range(num_nodes) if i != j) == 1, name=f"leave_{j}")
 
     # Capacity constraint
     for i in range(1, num_nodes):
-        model.addConstr(u[i] >= demands[i], name=f'capacity_{i}')
-        model.addConstr(u[i] <= capacity, name=f'capacity_{i}')
+        model.addConstr(u[i] >= demands[i], name=f"capacity_{i}")
+        model.addConstr(u[i] <= capacity, name=f"capacity_{i}")
 
     # Subtour elimination constraints
     for i in range(1, num_nodes):
@@ -304,7 +303,7 @@ def solve_cvrp(coordinates, demands, capacity):
             if i != j:
                 model.addConstr(
                     u[i] - u[j] + capacity * x[i, j] <= capacity - demands[j],
-                    name=f'subtour_{i}_{j}'
+                    name=f"subtour_{i}_{j}"
             )
     model.Params.OutputFlag = 0
     model.Params.Presolve = 2  # Aggressive presolve
@@ -317,7 +316,7 @@ def solve_cvrp(coordinates, demands, capacity):
         routes = []
         for i in range(1, num_nodes):
             if x[0, i].x > 0.5:
-                #print('Route starts at customer', i)
+                #print("Route starts at customer", i)
                 sequence = [0, i]
                 
                 # Search for the next customer, always save the sequence, and ensure it's different from the previous one
@@ -338,7 +337,7 @@ def solve_cvrp(coordinates, demands, capacity):
 # Function to visualize an instance and its optimal solution; additionally you can view cluster assignments of the corresponding model (DBSCAN)
 def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_problem, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
     
-    if (print_sequence == True): print('Total costs: {}\nOptimal solution: {}'.format(total_costs, sequence))
+    if (print_sequence == True): print("Total costs: {}\nOptimal solution: {}".format(total_costs, sequence))
 
     # Depot_coord: tuple with depot X and Y coordinate
     depot_coord = coord[0]
@@ -354,7 +353,7 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_p
         # Get the number depot appearances in the sequence to count the routes and used vehicles (only relevant for CVRP)
         new_route_starts = np.where([trip[0] == 0 for trip in sequence])[0]
         num_routes = len(new_route_starts)
-        colors = ['royalblue', 'coral', 'mediumseagreen', 'mediumorchid', 'sienna', 'dimgrey', 'crimson', 'silver', 'hotpink', 'darkcyan']
+        colors = ["royalblue", "coral", "mediumseagreen", "mediumorchid", "sienna", "dimgrey", "crimson", "silver", "hotpink", "darkcyan"]
 
         # Mark each route of the used vehicles with arrows in another color (first extract the routes inside of the sequence)
         route_labels = []
@@ -363,11 +362,11 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_p
             if (index == num_routes-1): route = sequence[new_route_starts[index] :]
 
             # Set the color
-            if (optimization_problem == 'TSP'): color = 'silver'
-            elif (optimization_problem == 'CVRP'): color = colors[index % len(colors)] # Start with the first color again if there are more routes than colors
+            if (optimization_problem == "TSP"): color = "silver"
+            elif (optimization_problem == "CVRP"): color = colors[index % len(colors)] # Start with the first color again if there are more routes than colors
 
             # Add the route label for the legend
-            route_label = f'Route {index + 1}'
+            route_label = f"Route {index + 1}"
             route_labels.append(route_label)
             
             for i, trip in enumerate(route):
@@ -379,22 +378,22 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_p
                 dy = coord[destination][1] - coord[origin][1]
                 plt.arrow(x=x, y=y, dx=dx, dy=dy, head_width=1.5, head_length=1.75, 
                           fc=color, ec=color, length_includes_head=True, zorder=2, 
-                          label=route_label if i == 0 else '')
+                          label=route_label if i == 0 else "")
 
     # Create scatter plot with depot (black) and customers (blue)
-    plt.scatter(x=depot_coord[0], y=depot_coord[1], color='crimson', label='Depot', marker='*', s=250, zorder=4)
+    plt.scatter(x=depot_coord[0], y=depot_coord[1], color="crimson", label="Depot", marker="*", s=250, zorder=4)
     if (assignments is None):
-        plt.scatter(x=x_coord, y=y_coord, color='steelblue', label='Customers', marker='o' if optimization_problem == 'TSP' else '.', s=50, zorder=3)
-        cluster_labels = ['Customers']
+        plt.scatter(x=x_coord, y=y_coord, color="steelblue", label="Customers", marker="o" if optimization_problem == "TSP" else ".", s=50, zorder=3)
+        cluster_labels = ["Customers"]
     
-    # Plot customers according to their cluster assignments if parameter 'assignments' is defined
+    # Plot customers according to their cluster assignments if parameter "assignments" is defined
     if (assignments is not None):
 
         # Plot customers according to their cluster assignments
-        cluster_labels = ['Cluster ' + str(int(i)) for i in np.unique(assignments)]
-        mglearn.discrete_scatter(x1=x_coord, x2=y_coord, y=assignments, markers='o', s=8, labels=cluster_labels)
+        cluster_labels = ["Cluster " + str(int(i)) for i in np.unique(assignments)]
+        mglearn.discrete_scatter(x1=x_coord, x2=y_coord, y=assignments, markers="o", s=8, labels=cluster_labels)
 
-        # DBSCAN: Mark core points in the plot if the parameter 'core_point_indices' is defined and there is at least one core point
+        # DBSCAN: Mark core points in the plot if the parameter "core_point_indices" is defined and there is at least one core point
         if (core_point_indices is not None) and (list(core_point_indices)):
 
             # Get list to selcet core points (e.g. core_point_indices = [0, 1, 2, 4])
@@ -402,17 +401,17 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_p
             core_points_mask[core_point_indices] = True # Set core point indices to one/True -> e.g. core_points_mask = [True, True, True, False, True]
 
             # Mark core points with a dot and add a label as clarification in the legend
-            mglearn.discrete_scatter(x1=x_coord[core_points_mask], x2=y_coord[core_points_mask], markers='.', s=5, c='k', labels=['Core Point'])
-            core_points_label = ['Core Point']
+            mglearn.discrete_scatter(x1=x_coord[core_points_mask], x2=y_coord[core_points_mask], markers=".", s=5, c="k", labels=["Core Point"])
+            core_points_label = ["Core Point"]
     
     # Add annotations to identify the customers
     for i in range(len(customer_coord)):
-        plt.annotate(text='C' + str(i+1), xy=(x_coord[i], y_coord[i]), textcoords='offset points', xytext=(0, 5), ha='center')
+        plt.annotate(text="C" + str(i+1), xy=(x_coord[i], y_coord[i]), textcoords="offset points", xytext=(0, 5), ha="center")
 
-    if (optimization_problem == 'TSP'): plt.title('Traveling Salesman Problem', size=16)
-    elif (optimization_problem == 'CVRP'): plt.title('Capacitated Vehicle Routing Problem', size=16)
-    plt.xlabel('X', fontweight='bold')
-    plt.ylabel('Y', fontweight='bold')
+    if (optimization_problem == "TSP"): plt.title("Traveling Salesman Problem", size=16)
+    elif (optimization_problem == "CVRP"): plt.title("Capacitated Vehicle Routing Problem", size=16)
+    plt.xlabel("X", fontweight="bold")
+    plt.ylabel("Y", fontweight="bold")
     plt.xticks(range(0, x_range[1] + 10, int(x_range[1]/10))) # Adjust x ticks dynamically to the given x_range
     plt.yticks(range(0, y_range[1] + 10, int(x_range[1]/10))) # Adjust y ticks dynamically to the given y_range
     plt.grid(True, zorder=0)
@@ -420,25 +419,25 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_p
     # Get handles and labels from all scatter plots and create the legend
     handles, labels = plt.gca().get_legend_handles_labels()
     
-    # Sort handles (legend symbols) and labels (legend names) to ensure the order 'Depot', 'Customers' / 'Clusters', 'Core Point' 'Route 1/2/3...'
-    depot_index = labels.index('Depot')
+    # Sort handles (legend symbols) and labels (legend names) to ensure the order "Depot", "Customers" / "Clusters", "Core Point" "Route 1/2/3..."
+    depot_index = labels.index("Depot")
     if (assignments is None):
-        customers_index = labels.index('Customers')
+        customers_index = labels.index("Customers")
         handles = [handles[depot_index], handles[customers_index]] + [h for i, h in enumerate(handles) if i not in [depot_index, customers_index]]
     elif (core_point_indices is not None) and (list(core_point_indices)):
         customers_index = [labels.index(cluster) for cluster in cluster_labels]
-        core_points_index = labels.index('Core Point')
+        core_points_index = labels.index("Core Point")
         handles = [handles[depot_index]] + [handles[i] for i in customers_index] + [handles[core_points_index]] + [h for i, h in enumerate(handles) if i not in [depot_index, customers_index, core_points_index]]
     else:
         customers_index = [labels.index(cluster) for cluster in cluster_labels]
         handles = [handles[depot_index]] + [handles[i] for i in customers_index] + [h for i, h in enumerate(handles) if i not in [depot_index, customers_index]]
     
     # Get unique labels and set legend labels dynamically
-    legend_labels = ['Depot'] + cluster_labels
+    legend_labels = ["Depot"] + cluster_labels
     if (core_point_indices is not None) and (list(core_point_indices)): legend_labels += core_points_label
-    if ('route_labels' in locals()): legend_labels += route_labels # Check wheater route_labels is defined
+    if ("route_labels" in locals()): legend_labels += route_labels # Check wheater route_labels is defined
 
-    plt.legend(handles, legend_labels, loc='best', bbox_to_anchor=(1.05, 1.0))
+    plt.legend(handles, legend_labels, loc="best", bbox_to_anchor=(1.05, 1.0))
     plt.show()
 
 
@@ -450,7 +449,7 @@ def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_p
 def fun_multi_dbscan(X, num_customers, model=DBSCAN, prints=False):
 
     # Define hyperparameters for all instance sizes (number of customers):
-    # Tuples with values for 'eps' (max. distance) and 'min_samples' parameter (min number of instances in distance 'eps') to define core points
+    # Tuples with values for "eps" (max. distance) and "min_samples" parameter (min number of instances in distance "eps") to define core points
     if (num_customers <= 7): hyperparameters = [(33, 3), (40, 2), (55, 2)] # 5/6/7 customers
     elif (num_customers <= 10): hyperparameters = [(30, 3), (37, 2), (52, 2)] # 8/9/10 customers
     elif (num_customers <= 12): hyperparameters = [(27, 3), (35, 2), (48, 2)] # 11/12 customers
@@ -459,7 +458,7 @@ def fun_multi_dbscan(X, num_customers, model=DBSCAN, prints=False):
     # Iterate over the hyperparameters tupels
     core_point_indices = []
     for i, tuple in enumerate(hyperparameters):
-        # Train DBSCAN with the tuple as parameters 'eps' and 'min_samples'
+        # Train DBSCAN with the tuple as parameters "eps" and "min_samples"
         dbscan = model(eps=tuple[0], min_samples=tuple[1])
 
         # First iteration: Train the model on the whole instance to find dense clusters
@@ -488,12 +487,12 @@ def fun_multi_dbscan(X, num_customers, model=DBSCAN, prints=False):
         X_residual = np.array(X)[assignments == -1]
         
         if (prints == True):
-            if (i == 0): print('\n############### CLUSTER FEATURES ###############')
-            print('- Min cluster size: {} with {} eps\n  labels: {}\n  Core points: {}'.format(tuple[1], tuple[0], assignments, core_points))
+            if (i == 0): print("\n############### CLUSTER FEATURES ###############")
+            print("- Min cluster size: {} with {} eps\n  labels: {}\n  Core points: {}".format(tuple[1], tuple[0], assignments, core_points))
 
         # Stop algorithm if all customers are assigned to a cluster
         if (len(X_residual) == 0):
-            if (prints == True): print('-> No outliers left!')
+            if (prints == True): print("-> No outliers left!")
             break
     
     return assignments, core_point_indices
@@ -504,72 +503,72 @@ def fun_cluster_features(data, assignments, core_point_indices, features, prints
     ###############################################################################
     # FEATURE 1, 2 & 3: CLUSTER ID, CORE POINT AND OUTLIER
     # Add cluster labels to the original data
-    data['Cluster'] = [np.nan] + list(assignments)
+    data["Cluster"] = [np.nan] + list(assignments)
 
     # Add True/False values depending on wheater a customer is a core point or an outlier
     core_points = np.zeros_like(assignments)
     core_points[core_point_indices] = True
-    data['Core Point'] = [np.nan] + list(core_points)
-    data['Outlier'] = [np.nan] + list(assignments == -1)
+    data["Core Point"] = [np.nan] + list(core_points)
+    data["Outlier"] = [np.nan] + list(assignments == -1)
 
     ###############################################################################
     # FEATURE 4 & 5: NUMBER OF CLUSTERS AND OUTLIERS
-    # Create new columns: 'Number Clusters' (exclude outliers) and 'Number Outliers' (count of the first label -1)
+    # Create new columns: "Number Clusters" (exclude outliers) and "Number Outliers" (count of the first label -1)
     labels = np.unique(assignments)
-    data['Number Clusters'] = len(labels[labels != -1])
-    data['Number Outliers'] = len(assignments[assignments == -1])
+    data["Number Clusters"] = len(labels[labels != -1])
+    data["Number Outliers"] = len(assignments[assignments == -1])
 
     # Compute centroids of all clusters (exclude the outliers) and get the depot coordinates
-    centroids = {cluster: np.array([data[data['Cluster'] == cluster][i].mean() for i in ['X', 'Y']]) for cluster in np.unique(labels[labels != -1])}
-    depot_coord = data.loc[0, ['X', 'Y']]
+    centroids = {cluster: np.array([data[data["Cluster"] == cluster][i].mean() for i in ["X", "Y"]]) for cluster in np.unique(labels[labels != -1])}
+    depot_coord = data.loc[0, ["X", "Y"]]
 
     # Iterate over each cluster (exclude the outliers)
     for cluster_id in labels[labels != -1]:
 
         # Filter data points belonging to the current cluster
-        cluster_data = data[data['Cluster'] == cluster_id]
+        cluster_data = data[data["Cluster"] == cluster_id]
         
-        # Set column 'Core Point' to zero if the cluster consists only out of two customers
-        if (len(cluster_data) == 2): data.loc[data['Cluster'] == cluster_id, 'Core Point'] = np.array([0, 0])
+        # Set column "Core Point" to zero if the cluster consists only out of two customers
+        if (len(cluster_data) == 2): data.loc[data["Cluster"] == cluster_id, "Core Point"] = np.array([0, 0])
 
         ###############################################################################
         # FEATURE 6: CLUSTER SIZE
         # Assign the cluster size (number of customers) to the corresponding rows in the DataFrame
-        data.loc[data['Cluster'] == cluster_id, 'Cluster Size'] = len(cluster_data)
+        data.loc[data["Cluster"] == cluster_id, "Cluster Size"] = len(cluster_data)
 
         ###############################################################################
         # FEATURE 7 & 8: CLUSTER CENTROID X AND Y COORDINATE
         # Compute the X and Y coordinates of the cluster centroid
         centroid = centroids[cluster_id]
-        data.loc[data['Cluster'] == cluster_id, 'X Centroid'] = centroid[0]
-        data.loc[data['Cluster'] == cluster_id, 'Y Centroid'] = centroid[1]
+        data.loc[data["Cluster"] == cluster_id, "X Centroid"] = centroid[0]
+        data.loc[data["Cluster"] == cluster_id, "Y Centroid"] = centroid[1]
 
         ###############################################################################
         # FEATURE 9: DISTANCE FROM CUSTOMER TO CENTROID
         # Calculate the distances from each customer to its cluster center (centroid) and assign the calculated distances to the corresponding rows in the DataFrame
-        distances = np.linalg.norm(cluster_data[['X', 'Y']] - centroid, axis=1)
+        distances = np.linalg.norm(cluster_data[["X", "Y"]] - centroid, axis=1)
         
-        data.loc[data['Cluster'] == cluster_id, 'Centroid Distance'] = distances
+        data.loc[data["Cluster"] == cluster_id, "Centroid Distance"] = distances
 
         if (prints == True):
-            print('  - Cluster: {}\n      Centroid: {}\n      Distances to centroid: {}'.format(cluster_id, 
-                                                                                                {'X': centroid[0], 'Y': centroid[1]}, 
-                                                                                                {'Customer ' + str(customer): distances[i] for i, customer in enumerate(list(data[data['Cluster'] == cluster_id].index))}))
+            print("  - Cluster: {}\n      Centroid: {}\n      Distances to centroid: {}".format(cluster_id, 
+                                                                                                {"X": centroid[0], "Y": centroid[1]}, 
+                                                                                                {"Customer " + str(customer): distances[i] for i, customer in enumerate(list(data[data["Cluster"] == cluster_id].index))}))
 
         ###############################################################################
         # FEATURE 10: DISTANCE FROM CENTROID TO DEPOT
         # Calculate the distance from the cluster center to the depot and assign the calculated distances to the corresponding rows in the DataFrame
         distance_to_depot = np.linalg.norm(centroid - depot_coord)
-        data.loc[data['Cluster'] == cluster_id, 'Centroid Distance To Depot'] = distance_to_depot
+        data.loc[data["Cluster"] == cluster_id, "Centroid Distance To Depot"] = distance_to_depot
 
         ###############################################################################
         # FEATURE 11: MINIMUM DISTANCE TO CUSTOMERS OF OTHER CLUSTERS FOR ALL CUSTOMERS IN CURRENT CLUSTER
         # Calculate distances to all customers in other clusters (excluding outliers and depot)
-        other_clusters_data = data[(data['Cluster'] != cluster_id) & (data['Cluster'] != -1)].iloc[1:]
+        other_clusters_data = data[(data["Cluster"] != cluster_id) & (data["Cluster"] != -1)].iloc[1:]
         
         # Calculate the distances to the customers of all other clusters if there are at least two clusters in total
         if (len(labels[labels != -1]) >= 2):
-            distances_to_other_clusters = cdist(cluster_data[['X', 'Y']], other_clusters_data[['X', 'Y']], metric='euclidean')
+            distances_to_other_clusters = cdist(cluster_data[["X", "Y"]], other_clusters_data[["X", "Y"]], metric="euclidean")
             
             # Get the minimum distance for each customer and assign them to the corresponding rows in the DataFrame
             min_distances_to_other_clusters = np.min(distances_to_other_clusters, axis=1)
@@ -577,7 +576,7 @@ def fun_cluster_features(data, assignments, core_point_indices, features, prints
         # Set the distances to infinity if there is no other cluster
         else: min_distances_to_other_clusters = 100000 # Or np.inf
 
-        data.loc[data['Cluster'] == cluster_id, 'Distance To Closest Other Cluster'] = min_distances_to_other_clusters
+        data.loc[data["Cluster"] == cluster_id, "Distance To Closest Other Cluster"] = min_distances_to_other_clusters
 
         ###############################################################################
         # FEATURE 12: MINIMUM DISTANCE TO CENTROIDS OF OTHER CLUSTERS FOR ALL CUSTOMERS IN CURRENT CLUSTER
@@ -586,67 +585,67 @@ def fun_cluster_features(data, assignments, core_point_indices, features, prints
         
         # Calculate the distance to all other centroids if there are at least three clusters in total
         if (len(labels[labels != -1]) >= 3):
-            distances_to_other_centroids = cdist(cluster_data[['X', 'Y']], [centroids[id] for id in other_cluster_ids], metric='euclidean')
+            distances_to_other_centroids = cdist(cluster_data[["X", "Y"]], [centroids[id] for id in other_cluster_ids], metric="euclidean")
             min_distances_to_other_centroids = np.min(distances_to_other_centroids, axis=1)
 
         # Calculate the distance to the other centroid if there are only two clusters in total
         elif (len(labels[labels != -1]) == 2):
-            min_distances_to_other_centroids = np.linalg.norm(cluster_data[['X', 'Y']] - [centroids[id] for id in other_cluster_ids][0], axis=1)
+            min_distances_to_other_centroids = np.linalg.norm(cluster_data[["X", "Y"]] - [centroids[id] for id in other_cluster_ids][0], axis=1)
 
         # Set the distances to infinity if there is no other cluster
         else: min_distances_to_other_centroids = 100000 # Or np.inf
         
-        data.loc[data['Cluster'] == cluster_id, 'Distance To Closest Other Centroid'] = min_distances_to_other_centroids
+        data.loc[data["Cluster"] == cluster_id, "Distance To Closest Other Centroid"] = min_distances_to_other_centroids
 
         ###############################################################################
         # FEATURE 13 & 14: CLUSTER AREA AND DENSITY
         # Calculate the area of the cluster assuming it as circular and then the density
-        min_x, min_y = np.min(cluster_data[['X', 'Y']], axis=0)
-        max_x, max_y = np.max(cluster_data[['X', 'Y']], axis=0)
+        min_x, min_y = np.min(cluster_data[["X", "Y"]], axis=0)
+        max_x, max_y = np.max(cluster_data[["X", "Y"]], axis=0)
         diameter = max(max_x - min_x, max_y - min_y)
 
         # Apply formulas and assign the calculated values to the corresponding rows in the DataFrame
         area = np.pi * (diameter / 2) ** 2 # Formula for the area of a circle
         density = len(cluster_data) / area # Formula for the density
-        data.loc[data['Cluster'] == cluster_id, 'Cluster Area'] = area
-        data.loc[data['Cluster'] == cluster_id, 'Cluster Density'] = density
+        data.loc[data["Cluster"] == cluster_id, "Cluster Area"] = area
+        data.loc[data["Cluster"] == cluster_id, "Cluster Density"] = density
     
     ###############################################################################
     # OUTLIERS: Treat each outlier like a single cluster if there is at least one outlier
     if (len(labels[labels == -1]) >= 1):
-        data.loc[data['Cluster'] == -1, ['Centroid Distance', 'Cluster Area']] = 0 # Or np.nan
-        data.loc[data['Cluster'] == -1, ['Cluster Size', 'Cluster Area', 'Cluster Density']] = 1 # Or np.nan
-        data.loc[data['Cluster'] == -1, 'X Centroid'] = data.loc[data['Cluster'] == -1, 'X']
-        data.loc[data['Cluster'] == -1, 'Y Centroid'] = data.loc[data['Cluster'] == -1, 'Y']
-        data.loc[data['Cluster'] == -1, 'Centroid Distance To Depot'] = data.loc[data['Cluster'] == -1, 'Depot Distance']
+        data.loc[data["Cluster"] == -1, ["Centroid Distance", "Cluster Area"]] = 0 # Or np.nan
+        data.loc[data["Cluster"] == -1, ["Cluster Size", "Cluster Area", "Cluster Density"]] = 1 # Or np.nan
+        data.loc[data["Cluster"] == -1, "X Centroid"] = data.loc[data["Cluster"] == -1, "X"]
+        data.loc[data["Cluster"] == -1, "Y Centroid"] = data.loc[data["Cluster"] == -1, "Y"]
+        data.loc[data["Cluster"] == -1, "Centroid Distance To Depot"] = data.loc[data["Cluster"] == -1, "Depot Distance"]
         
         # Get the data of all outliers and all customers in a cluster (excluding depot)
-        outlier_data = data.loc[data['Cluster'] == -1]
-        all_clusters_data = data[data['Cluster'] != -1].iloc[1:]
+        outlier_data = data.loc[data["Cluster"] == -1]
+        all_clusters_data = data[data["Cluster"] != -1].iloc[1:]
 
         # Compute the distances to all other customers in a cluster for each outlier and get the minimum distance
         if (len(outlier_data) > 1):
-            distances_to_other_clusters = cdist(outlier_data[['X', 'Y']], all_clusters_data[['X', 'Y']], metric='euclidean')
+            distances_to_other_clusters = cdist(outlier_data[["X", "Y"]], all_clusters_data[["X", "Y"]], metric="euclidean")
             min_distances_to_other_clusters = [min(array) for array in distances_to_other_clusters]
         else:
-            distances_to_other_clusters = np.array([np.linalg.norm(outlier_data[['X', 'Y']] - all_clusters_data.iloc[customer][['X', 'Y']]) for customer in range(len(all_clusters_data))])
+            distances_to_other_clusters = np.array([np.linalg.norm(outlier_data[["X", "Y"]] - all_clusters_data.iloc[customer][["X", "Y"]]) for customer in range(len(all_clusters_data))])
             min_distances_to_other_clusters = min(distances_to_other_clusters)
         
         # Compute the distances to all cluster centroids for each outlier and get the minimum distance
-        distances_to_other_centroids = np.array([[np.linalg.norm(outlier_data.iloc[outlier][['X', 'Y']] - centroid) for centroid in centroids.values()] for outlier in range(len(outlier_data))])
+        distances_to_other_centroids = np.array([[np.linalg.norm(outlier_data.iloc[outlier][["X", "Y"]] - centroid) for centroid in centroids.values()] for outlier in range(len(outlier_data))])
         min_distances_to_other_centroids = [min(array) for array in distances_to_other_centroids]
 
         # Assign these values to the corresponding rows
-        data.loc[data['Cluster'] == -1, 'Distance To Closest Other Cluster'] = min_distances_to_other_clusters
-        data.loc[data['Cluster'] == -1, 'Distance To Closest Other Centroid'] = min_distances_to_other_centroids
+        data.loc[data["Cluster"] == -1, "Distance To Closest Other Cluster"] = min_distances_to_other_clusters
+        data.loc[data["Cluster"] == -1, "Distance To Closest Other Centroid"] = min_distances_to_other_centroids
     
     # Add features total demand for each cluster and the proportion of the customers cluster demand for the CVRP
-    if ('Demand' in data.columns):
-        data['Cluster Demand'] = data.groupby('Cluster')['Demand'].transform('sum')
-        data['Cluster Demand Proportion'] =  data['Demand'] / data['Cluster Demand']
+    if ("Demand" in data.columns):
+        data["Cluster Demand"] = data.groupby("Cluster")["Demand"].transform("sum")
+        data["Cluster Demand Proportion"] =  data["Demand"] / data["Cluster Demand"]
 
     # Turn columns into integers
-    data[['Cluster', 'Core Point', 'Outlier', 'Cluster Size']] = data[['Cluster', 'Core Point', 'Outlier', 'Cluster Size']].apply(pd.to_numeric, errors='coerce').astype('Int64')
+    data[["Cluster", "Core Point", "Outlier", "Cluster Size"]] = data[["Cluster", "Core Point", "Outlier", "Cluster Size"]].apply(pd.to_numeric, errors="coerce").astype("Int64")
 
     if (prints == True): display(data[features])
 
