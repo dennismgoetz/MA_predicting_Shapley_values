@@ -1,1 +1,1 @@
-{"Search type": "GridSearchCV", "Parameter combinations": 12, "Total tuning time": "1m, 16s", "Total tuning fit time": "1s", "Total tuning prediction time": "4m, 22s"}
+{"Search type": "GridSearchCV", "Parameter combinations": 12, "Total tuning time": "39s", "Total tuning fit time": "1s", "Total tuning prediction time": "2m, 12s"}

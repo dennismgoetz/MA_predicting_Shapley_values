@@ -14,10 +14,10 @@ parent_directory = os.path.dirname(current_directory)
 sys.path.append(parent_directory)
 
 # Import helperfunctions
-from ML_functions import fun_load_settings
+from ML_functions import fun_load_settings, fun_get_features_of_preprocessor
 
 # Define the optimization problem (choose either "TSP" or "CVRP")
-default_optimization_problem = "TSP"
+default_optimization_problem = "CVRP"
 
 # Call the function to define optimization_problem based on how the notebook is executed
 # If the notebook is run by the script "main.ipynb", load optimization_problem from "settings.json". Otherwise use the default optimization problem from above
@@ -28,8 +28,9 @@ optimization_problem = fun_load_settings(default_optimization_problem, prints=Fa
 ###############################################################################
 
 # Create a dictionary with all model names as keys and their corresponding names in a file as values
-model_names = {"K-nearest Neighbor (KNN)": "KNN", 
+model_names = {"K-nearest Neighbor (KNN)2": "KNN", 
                "Ridge Regression": "Ridge", 
+               "Polynomial Regression": "PR", 
                "Decision Tree": "DT", 
                "Random Forest": "RF", 
                "Gradient Boosting Regression Trees (GBRT)": "GBRT", 
@@ -77,9 +78,25 @@ def fun_pdf_tuning_results(model_key, model_names, file_names, optimization_prob
                 with open(file_path, "rb") as file:
                     data = pickle.load(file)
 
-                # Get the keys of the parameter grid/distribution dictionary and reorder the dictionary with the best combination
-                if (i == 1): keys = data.keys()
-                else: data = {key: data[key] for key in keys}
+                # Get the keys of the parameter grid/distribution dictionary
+                if (file_key == "Parameter grid/distribution"): 
+                    if (isinstance(data, dict)): keys = data.keys()
+
+                    # Polynomial Regression: grid is a list with two dictionaries (get the keys of the first dictionary)
+                    elif (isinstance(data, list)):
+                        # Modify the param grid dictionary (create a list with the feature sets and add it to the dictionary instead of "preprocessor")
+                        feature_set_list = [fun_get_features_of_preprocessor(data[0]["preprocessor"][0]), fun_get_features_of_preprocessor(data[1]["preprocessor"][0])]
+                        data[0].pop("preprocessor")
+                        data = {**{"feature_set": feature_set_list}, **data[0]}
+                        keys = data.keys()
+
+                # Modify the best parameters dictionary
+                if (file_key == "Best parameters") and ("feature_set" in keys):
+                    data["feature_set"] = fun_get_features_of_preprocessor(data["preprocessor"]) # Get the used features for polynomial regression
+                    data.pop("preprocessor")
+                
+                # Reorder the dictionary with the best combination
+                data = {key: data[key] for key in keys} # Same order as in the parameter grid/distribution dictionary
 
             else:
                 with open(file_path, "r") as file:
@@ -135,7 +152,7 @@ df = pd.DataFrame(data=[search_types, parameter_combinations, tuning_times, fit_
 excel_file_name = str(f"c_{optimization_problem}_tuning_details.xlsx")
 df.to_excel(excel_file_name)
 
-print(f"\nScript 'a_tuning_summary.py' completed!\nFiles '{pdf_file_name}' and '{excel_file_name}' saved succesfully.\n")
+print(f"\nScript 'a_tuning_summary.py' completed!")
 
 # Change working directory back to the parent path
 os.chdir(parent_directory)

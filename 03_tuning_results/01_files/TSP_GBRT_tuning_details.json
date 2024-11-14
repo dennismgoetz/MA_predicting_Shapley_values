@@ -1,1 +1,1 @@
-{"Search type": "RandomizedSearchCV", "Parameter combinations": 25, "Total tuning time": "34m, 7s", "Total tuning fit time": "2h, 9m", "Total tuning prediction time": "10s"}
+{"Search type": "RandomizedSearchCV", "Parameter combinations": 25, "Total tuning time": "19m, 46s", "Total tuning fit time": "1h, 14m", "Total tuning prediction time": "6s"}

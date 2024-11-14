@@ -144,7 +144,7 @@ def fun_shapley_value(player_index, characteristic_function, prints=False):
     player_index : int
         index of customer
     characteristic_function : dictionary
-        characteristic function of the instance -> all possible subsets of the customers as keys and the respective total costs of the subsets as values
+        characteristic function of the instance -> all possible subsets of the customers as keys and the respective total cost of the subsets as values
     prints : boolean
         prints interim results for understanding/debugging
     
@@ -182,16 +182,16 @@ def fun_shapley_value(player_index, characteristic_function, prints=False):
 
             # Check wheater player is in subset/coalition
             if player_index in coalition:
-                # Get total costs of subset with subset as key; if key is not in the dictionary return 0
+                # Get total cost of subset with subset as key; if key is not in the dictionary return 0
                 coalition_value = characteristic_function.get(coalition, 0)
-                if (prints == True): print("      Subset: {}, Total costs: {}".format(coalition, coalition_value))
+                if (prints == True): print("      Subset: {}, Total cost: {}".format(coalition, coalition_value))
 
-                # Get the total costs of the subset without the player customer/player
+                # Get the total cost of the subset without the player customer/player
                 coalition_without_i = set(coalition) - {player_index}
                 prev_coalition_value = characteristic_function.get(tuple(sorted(coalition_without_i)), 0)
-                if (prints == True): print("        Subset without customer: {}, Total costs: {}".format(coalition_without_i, prev_coalition_value))
+                if (prints == True): print("        Subset without customer: {}, Total cost: {}".format(coalition_without_i, prev_coalition_value))
 
-                # Compute marginal costs of customer/player in the subset
+                # Compute marginal cost of customer/player in the subset
                 marginal_contribution = coalition_value - prev_coalition_value
                 if (prints == True): print("        Marginal contribution: {} - {} = {}".format(coalition_value, prev_coalition_value, marginal_contribution))
                 
@@ -248,8 +248,8 @@ def solve_tsp(coordinates):
     # Extract the solution
     if model.status == gp.GRB.OPTIMAL:
         solution = [(i, j) for i in range(num_coordinates) for j in range(num_coordinates) if i != j and x[i, j].x > 0.5]
-        total_costs = model.objVal
-        return solution, total_costs
+        total_cost = model.objVal
+        return solution, total_cost
     else:
         return None, None
 
@@ -335,9 +335,9 @@ def solve_cvrp(coordinates, demands, capacity):
         return None, None
 
 # Function to visualize an instance and its optimal solution; additionally you can view cluster assignments of the corresponding model (DBSCAN)
-def plot_instance(coord, sequence, total_costs, x_range, y_range, optimization_problem, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
+def plot_instance(coord, sequence, total_cost, x_range, y_range, optimization_problem, assignments=None, core_point_indices=None, plot_sequence=True, print_sequence=False):
     
-    if (print_sequence == True): print("Total costs: {}\nOptimal solution: {}".format(total_costs, sequence))
+    if (print_sequence == True): print("Total cost: {}\nOptimal solution: {}".format(total_cost, sequence))
 
     # Depot_coord: tuple with depot X and Y coordinate
     depot_coord = coord[0]

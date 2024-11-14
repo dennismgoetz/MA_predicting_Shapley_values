@@ -26,11 +26,11 @@ def run_notebook(notebook_path):
         
         # Stop the timer make a print indicating the script completion and its run time 
         run_time = fun_convert_time(start=start, end=time.time())
-        print(f"Notebook {notebook_path:<19} completed!  Run time: {run_time}")
+        print(f"""Notebook {str(f"'{notebook_path}'"):<28} completed!  Run time: {run_time}""") # Ensure that the name takes 28 spaces for alignment
     
     # Raise a message if an error occurs during the execution of the notebook
     except subprocess.CalledProcessError:
-        print(f"Error: Failed to execute the notebook {notebook_path}.")
+        print(f"Error: Failed to execute the notebook '{notebook_path}'.")
 
 # Function to define the optimization problem based on the execution context (direct execution or execution by another script)
 def fun_load_settings(default_optimization_problem, prints=True):
@@ -51,7 +51,7 @@ def fun_load_settings(default_optimization_problem, prints=True):
         optimization_problem = default_optimization_problem
         if prints: print("The notebook is executed directly. :)")
     
-    if prints: print(f"Optimization Problem: '{optimization_problem}'")
+    if prints: print(f"Optimization problem: '{optimization_problem}'")
     return optimization_problem
 
 
@@ -78,9 +78,12 @@ def fun_load_data(optimization_problem):
     elif (optimization_problem == "TSP_blended_proxy"): # To create features (Φ DEPOT, Φ MOAT) for blended proxy Φ BLEND
         subfolder_path = "..\\..\\01_data\\01_TSP" # Go one folder further back, as the benchmark scripts are in a subfolder
         file_name = "tsp_instances_j_updated.xlsx"
-    elif (optimization_problem == "TSP_benchmarks"): # For evaluation of SHAPO and blended proxy 
+    elif (optimization_problem == "TSP_benchmarks"): # For evaluation of SHAPO, depot distance and blended proxy 
         subfolder_path = "..\\..\\01_data\\01_TSP"
-        file_name = "tsp_instances_benchmarks.xlsx" # Data set includes SHAPO and Φ BLEND
+        file_name = "tsp_instances_benchmarks.xlsx" # Data set includes SHAPO, Φ DEPOT and Φ BLEND
+    elif (optimization_problem == "CVRP_benchmark"): # For evaluation of depot distance
+        subfolder_path = "..\\..\\01_data\\02_CVRP"
+        file_name = "cvrp_instances_j_updated.xlsx"
 
     # Select current working directory and subfolder to load the file
     current_directory = os.getcwd()
@@ -112,6 +115,7 @@ def fun_preprocessing(data, train_size, keep_SHAPO=False):
     # Remove the extracted features
     extracted_features_tsp = ["Unnamed: 0.1", "Unnamed: 0", "Shapley Value Cluster", "Percentage_error", "Percentage Error",
                               "Outlier", "Core Point", "Number Outliers", "Centroid Distance Ratio", "Distance To Closest Other Centroid Ratio", 
+                              "Distance To Closest Other Cluster Ratio", "Cluster", 
                               "X Mean", "Y Mean", "9th CCD Ratio", "10th CCD Ratio"]
     
     # Remove the predictions of the SHAPO approximation by default
@@ -128,6 +132,11 @@ def fun_preprocessing(data, train_size, keep_SHAPO=False):
     extracted_features = extracted_features_tsp + extracted_features_bin_packing
     columns = [i for i in columns if i not in extracted_features]
     train_data = data[columns]
+
+    ############################## Hierarchical indexing ##############################
+    # Turn column "Instance ID" into the second level index as this is not a feature
+    train_data.set_index("Instance ID", append=True, drop=True, inplace=True)
+    train_data.index.names = ["Index", "Instance ID"]
 
     ############################## Train Test Split ##############################
 
@@ -188,17 +197,17 @@ def fun_fit_tuning(search_method, X_train, y_train, file_name):
     os.makedirs(subfolder, exist_ok=True) # Create subfolder if it doesn't exist
 
     # Save the parameter grid/distribution
-    file_path = os.path.join(subfolder, file_name + "_param_grid.pkl")
+    file_path = os.path.join(subfolder, f"{file_name}_param_grid.pkl")
     with open(file_path, "wb") as file: # "w" for writring binary
         pickle.dump(param_grid, file)
 
     # Save the best parameters to a file
-    file_path = os.path.join(subfolder, file_name + "_best_params.pkl")
+    file_path = os.path.join(subfolder, f"{file_name}_best_params.pkl")
     with open(file_path, "wb") as file:
         pickle.dump(best_params, file)
     
     # Save the run times to a file
-    file_path = os.path.join(subfolder, file_name + "_tuning_details.json")
+    file_path = os.path.join(subfolder, f"{file_name}_tuning_details.json")
     with open(file_path, "w") as file:
         json.dump(tuning_details, file)
 
@@ -209,13 +218,19 @@ def fun_load_best_params(optimization_problem, model_abbreviation):
 
     # Select subfolder and combine the subfolder with the file name to get the file path
     subfolder = "03_tuning_results/01_files"
-    file_name = optimization_problem + "_" + model_abbreviation + "_best_params.pkl"
+    file_name = f"{optimization_problem}_{model_abbreviation}_best_params.pkl"
     file_path = os.path.join(subfolder, file_name)
 
     # Load the file and show the best parameters
     with open(file_path, "rb") as file:
         best_params = pickle.load(file)
-    display(best_params)
+    
+    # Get features used for polynomial terms and interactions in polynomial regression
+    if ("preprocessor" in list(best_params.keys())):
+        dict1 = {"feature_set": fun_get_features_of_preprocessor(best_params["preprocessor"])}
+        dict2 = {key: value for key, value in best_params.items() if key != "preprocessor"}
+        display({**dict1, **dict2})
+    else: display(best_params)
 
     return best_params
 
@@ -225,22 +240,22 @@ def fun_load_best_params(optimization_problem, model_abbreviation):
 # TIME FUNCTIONS
 ###############################################################################
 # Function to turn seconds into minutes, hours, days
-def fun_convert_time(start=None, end=None, seconds=None):
+def fun_convert_time(start=None, end=None, seconds=None, space=" "):
     if(seconds is None): seconds = int(end - start)
     if seconds < 60: # Less than a minute
         computation_time = f"{int(seconds)}s"
     elif seconds < 3600: # Less than an hour (60 * 60 = 3600)
         minutes = seconds // 60
         remaining_seconds = (seconds % 60)
-        computation_time = f"{int(minutes)}m, {int(remaining_seconds)}s"
+        computation_time = f"{int(minutes)}m,{space}{int(remaining_seconds)}s"
     elif seconds < 86400: # Less than a day (60 * 60 * 24 = 86400)
         hours = seconds // 3600
         remaining_minutes = (seconds % 3600) // 60
-        computation_time = f"{int(hours)}h, {int(remaining_minutes)}m"
+        computation_time = f"{int(hours)}h,{space}{int(remaining_minutes)}m"
     else: # More than a day
         days = seconds // 86400
         remaining_hours = (seconds % 86400) // 3600
-        computation_time = f"{int(days)}d, {int(remaining_hours)}h"
+        computation_time = f"{int(days)}d,{space}{int(remaining_hours)}h"
     return computation_time
 
 
@@ -254,23 +269,26 @@ def fun_scaled_neg_MAPE(estimator, X, y_true):
     # Make predictions
     y_pred = estimator.predict(X)
 
-    # Connect the X_predict Data Frame with the true y labels of y_true; then assighn the predictions as a columns to the Data Frame
+    # Connect the X Data Frame with the true y labels ; then assign the predictions as a columns to the Data Frame
     Xy_train = pd.merge(left=X, right=y_true, left_index=True, right_index=True)
     Xy_train_pred = Xy_train.assign(Predictions=pd.Series(data=y_pred, index=X.index))
 
-    # Compute the sum of predicted Shapley values and the MAPE without scaling
+    # Compute the sum of predicted Shapley values and the APE (absolute percentage error) for each customer without scaling
     Xy_train_pred["Sum of Predictions"] = Xy_train_pred.groupby("Instance ID")["Predictions"].transform("sum")
-    Xy_train_pred["MAPE (original)"] = np.abs((y_true - y_pred) / y_true)
+    Xy_train_pred["APE (original)"] = np.abs((y_true - y_pred) / y_true)
     
-    # Scale the predictions with the sum of the Shapley Values and receive the new predictions (the sum of the predicted Shapley values should be equal to the total costs of an instance)
-    unit = "Costs" if ("Total Costs" in X.columns) else "Bins" # Feature name in TSP and CVRP: "Total Costs", Bin_Packing: "Total Bins"
+    # Scale the predictions with the total cost and receive the new predictions (the sum of the predicted Shapley values should equal the total cost of an instance)
+    unit = "Cost" if ("Total Cost" in X.columns) else "Bins" # Feature name in TSP and CVRP: "Total Cost", Bin_Packing: "Total Bins"
     entities = "Customers" if ("Number Customers" in X.columns) else "Items"
     y_pred = Xy_train_pred["Predictions"] * (Xy_train_pred["Total " + unit] / Xy_train_pred["Sum of Predictions"])
 
-    # Put the new predictions in column "Improved Predictions" and compute the new MAPE with scaling; optionally view the Data Frame Xy_train_pred (only possible if n_jobs is not -1 during CV)
+    # Put the new predictions in column "Improved Predictions" and compute the new APE with scaling
     Xy_train_pred["Improved Predictions"] = y_pred
-    Xy_train_pred["MAPE (scaled)"] = np.abs((y_true - y_pred) / y_true)
-    #display(Xy_train_pred[["Instance ID", "Number " + entities, "Total " + unit, "Sum of Predictions", "Predictions", "Improved Predictions", "Shapley Value", "MAPE (original)", "MAPE (scaled)"]].sort_index().head(12))
+    Xy_train_pred["APE (scaled)"] = np.abs((y_true - y_pred) / y_true)
+    
+    # Optionally view the data frame Xy_train_pred (only possible if n_jobs is not -1 during CV)
+    #display(Xy_train_pred[["Number " + entities, "Total " + unit, "Sum of Predictions", "Predictions", 
+    #                       "Improved Predictions", "Shapley Value", "APE (original)", "APE (scaled)"]].sort_index().head(12))
     
     return - np.mean(np.abs((y_true - y_pred) / y_true))
 
@@ -286,8 +304,8 @@ def fun_scaled_neg_RMSE(estimator, X, y_true):
     # Compute the sum of predicted Shapley values
     Xy_train_pred["Sum of Predictions"] = Xy_train_pred.groupby("Instance ID")["Predictions"].transform("sum")
     
-    # Scale the predictions with the sum of the Shapley Values and receive the new predictions (the sum of the predicted Shapley values should be equal to the total costs of an instance)
-    unit = "Costs" if ("Total Costs" in X.columns) else "Bins" # Feature name in TSP and CVRP: "Total Costs", Bin_Packing: "Total Bins"
+    # Scale the predictions with the sum of the Shapley Values and receive the new predictions (the sum of the predicted Shapley values should be equal to the total cost of an instance)
+    unit = "Cost" if ("Total Cost" in X.columns) else "Bins" # Feature name in TSP and CVRP: "Total Cost", Bin_Packing: "Total Bins"
     y_pred = Xy_train_pred["Predictions"] * (Xy_train_pred["Total " + unit] / Xy_train_pred["Sum of Predictions"])
 
     return - np.sqrt(np.mean((y_true - y_pred)**2))
@@ -311,31 +329,32 @@ def fun_predict_with_scaling(model, X_train, y_train, X_test, y_test, apply_scal
         y_pred = model.predict(X_test)
         prediction_time = fun_convert_time(start=start, end=time.time())
     
-    # Improve predictions: Sum of predicted Shapley values must be equal to the total costs for all instances
+    # Improve predictions: Sum of predicted Shapley values must be equal to the total cost for all instances
     if (apply_scaling == True):
         
         # Connect the X_predict Data Frame with the true y labels of y_test; then assighn the predictions as a columns to the Data Frame
-        Xy_train = pd.merge(left=X_test, right=y_test, left_index=True, right_index=True)
-        Xy_train_pred = Xy_train.assign(Predictions=pd.Series(data=y_pred, index=X_test.index))
+        Xy_test = pd.merge(left=X_test, right=y_test, left_index=True, right_index=True)
+        Xy_test_pred = Xy_test.assign(Predictions=pd.Series(data=y_pred, index=X_test.index))
         
         # Compute the sum of predicted Shapley values
-        Xy_train_pred["Sum of Predictions"] = Xy_train_pred.groupby("Instance ID")["Predictions"].transform("sum")
+        Xy_test_pred["Sum of Predictions"] = Xy_test_pred.groupby("Instance ID")["Predictions"].transform("sum")
         
-        # Scale the predictions with the sum of the Shapley Values and receive the new predictions (the sum of the predicted Shapley values should be equal to the total costs of an instance)
-        unit = "Costs" if ("Total Costs" in X_train.columns) else "Bins" # Feature name in TSP and CVRP: "Total Costs", Bin_Packing: "Total Bins"
+        # Scale the predictions with the sum of the Shapley Values and receive the new predictions (the sum of the predicted Shapley values should be equal to the total cost of an instance)
+        unit = "Cost" if ("Total Cost" in X_train.columns) else "Bins" # Feature name in TSP and CVRP: "Total Cost", BPP: "Total Bins"
         entities = "Customers" if ("Number Customers" in X_train.columns) else "Items"
-        y_pred = Xy_train_pred["Predictions"] * (Xy_train_pred["Total " + unit] / Xy_train_pred["Sum of Predictions"])
+        y_pred = Xy_test_pred["Predictions"] * (Xy_test_pred["Total " + unit] / Xy_test_pred["Sum of Predictions"])
   
-        # Put the new predictions in column "Improved Predictions"; optionally view the Data Frame Xy_train_pred
-        Xy_train_pred["Improved Predictions"] = y_pred
-        #display(Xy_train_pred[["Instance ID", "Number " + entities, "Total " + unit, "Sum of Predictions", "Predictions", "Improved Predictions", "Shapley Value"]].sort_index().head(12))
-    
+        # Put the new predictions in column "Improved Predictions"; optionally view the data frame Xy_test_pred
+        Xy_test_pred["Improved Predictions"] = y_pred
+        #display(Xy_test_pred[["Number " + entities, "Total " + unit, "Sum of Predictions", "Predictions", 
+        #                      "Improved Predictions", "Shapley Value"]].sort_index().head(12))
+
     # If the scaling is not applied, just add the correct indices to the predictions for the categorical scores later on
     else: y_pred = pd.Series(data=y_pred, index=X_test.index)
 
     # Compute errors
-    MAPE_score = np.round(mean_absolute_percentage_error(y_true=y_test, y_pred=y_pred), 6) * 100
-    RMSE_score = np.round(root_mean_squared_error(y_true=y_test, y_pred=y_pred), 4)
+    MAPE_score = np.round(mean_absolute_percentage_error(y_true=y_test, y_pred=y_pred), 4) * 100
+    RMSE_score = np.round(root_mean_squared_error(y_true=y_test, y_pred=y_pred), 2)
 
     return MAPE_score, RMSE_score, y_pred, fit_time, prediction_time
 
@@ -344,6 +363,19 @@ def fun_predict_with_scaling(model, X_train, y_train, X_test, y_test, apply_scal
 ###############################################################################
 # SCORING FUNCTIONS
 ###############################################################################
+# Function to extract the feature set used for computing the polynomial terms and interactions for the polynomial regression
+def fun_get_features_of_preprocessor(preprocessor):
+
+    # The features are in the second [1] transformer (first: "onehot", second: "poly") and in the third [2] entry of that tuple
+    num_features = len(preprocessor.transformers[1][2])
+
+    # If the length is 20 the best combination was achieved with the top20 features, else with all features
+    if (num_features == 20): features = "top20_features"
+    elif ((num_features == 35) or (num_features == 40)): features = str(f"all_features ({num_features})") # 35 for TSP and 40 for CVRP
+    else: features = str(f"Number of features: {num_features}")
+
+    return features
+
 # Function to view grid search CV scores of all parameter combinations
 def fun_tuning_results(search_method, search_space):
     # Turn results into a data frame and modify the "mean_fit_time" column for better understanding
@@ -363,6 +395,10 @@ def fun_tuning_results(search_method, search_space):
     columns = [name.split("__")[-1] for name in columns] # Remove the model name before "__": "mlpregressor__alpha" -> "alpha"
     results_df.columns = columns
 
+    # Polynomial Regression: Extract from the preprocessor in each combination the feature set used for computing the polynomial terms and interactions
+    if ("preprocessor" in columns):
+        results_df["preprocessor"] = results_df["preprocessor"].apply(fun_get_features_of_preprocessor)
+
     # Display multiple Data Frames if the results_df has too many rows (max is 60 rows for displaying all rows)
     display(Markdown("**Cross validation scores of different parameter combinations:**"))
     if len(results_df) > 60:
@@ -373,25 +409,54 @@ def fun_tuning_results(search_method, search_space):
     else: display(results_df)
 
 # Compute train and test scores
-def fun_scores(model, X_train, y_train, X_test=None, y_test=None, apply_scaling=True, compute_test_scores=False):
+def fun_scores(model, X_train, y_train, X_test=None, y_test=None, apply_scaling=True, compute_test_scores=False, cv_n_jobs=-1):
 
     # Get CV train scores of a grid search model
     if (hasattr(model, "best_score_")):
-        MAPE_train = - np.round(model.best_score_, 6) * 100
+        MAPE_train = - np.round(model.best_score_, 4) * 100
         RMSE_train, cv_computation_time = None, None
-        print("CV MAPE (scaled) train data:  {} %".format(MAPE_train)) 
+        print(f"CV MAPE (scaled) train data: {MAPE_train} %") 
         
         # Show best parameter combination
         display(Markdown("**Best model / parameter combination:**"))
-        if (len(model.get_params()) <= 10): display(model.best_estimator_)
-        else: display(model.best_params_)
+
+        # Display the best estimator if there are not too many parameters in the model
+        if (len(model.get_params()) <= 10): 
+            display(model.best_estimator_)
+
+        else: 
+            # Get the dictionary with the best parameters identified by the search method 
+            best_params_dict = model.best_params_
+
+            # Polynomial Regression: Replace "preprocessor" entry with used features for computing polynomial terms and interactions
+            if ("preprocessor" in list(best_params_dict.keys())):
+                
+                # Get the preprocessor instance (ColumnTransformer)
+                preprocessor = best_params_dict["preprocessor"]
+
+                # Extract the feature set used for computing the polynomial terms and interactions from the preprocessor
+                features = fun_get_features_of_preprocessor(preprocessor)
+
+                # Create the dictionaries with the best parameters and merge them
+                dict1 = {"feature_set": features} # First entry of the dicionary
+
+                # Get all the other best parameters except "preprocessor"
+                dict2 = {key: value for key, value in best_params_dict.items() if key != "preprocessor"}
+
+                # Merge the dictionaries and display the new dictionary with the new entry
+                best_params_dict_new = {**dict1, **dict2}
+                display(best_params_dict_new)
+
+            else: display(best_params_dict)
 
     # Compute CV train scores if model is a usual estimator and measure CV computation time
     else:
         # Get MAPE and RMSE scores from the model's scaled predictions and unscaled predictions
         start = time.time()
-        cv_scores = cross_validate(estimator=model, X=X_train, y=y_train, n_jobs=-1, 
-                                   cv=GroupKFold(n_splits=3).split(X_train, y_train, groups=X_train["Instance ID"]), # Cross-validation with GroupKFold to keep instances together in one fold
+        cv_scores = cross_validate(estimator=model, X=X_train, y=y_train, n_jobs=cv_n_jobs, 
+                                   # Cross-validation with GroupKFold to keep instances together in one fold
+                                   cv=GroupKFold(n_splits=3).split(X_train, y_train, 
+                                                                   groups=X_train.index.get_level_values(level="Instance ID")), 
                                    scoring={"scaled_mape": fun_scaled_neg_MAPE,
                                             "scaled_rmse": fun_scaled_neg_RMSE,
                                             "original_neg_mape": "neg_mean_absolute_percentage_error",
@@ -400,13 +465,13 @@ def fun_scores(model, X_train, y_train, X_test=None, y_test=None, apply_scaling=
 
         # Print train scores for either the scaled predictions or the unscaled predictions
         if (apply_scaling == True):
-            MAPE_train = - np.round(cv_scores["test_scaled_mape"].mean(), 6) * 100
-            RMSE_train = - np.round(cv_scores["test_scaled_rmse"].mean(), 4)
+            MAPE_train = - np.round(cv_scores["test_scaled_mape"].mean(), 4) * 100
+            RMSE_train = - np.round(cv_scores["test_scaled_rmse"].mean(), 2)
         else:
-            MAPE_train = - np.round(cv_scores["test_original_neg_mape"].mean(), 6) * 100
-            RMSE_train = - np.round(cv_scores["test_original_neg_rmse"].mean(), 4)
-        print("CV MAPE ({}) train data:  {} %".format("scaled" if apply_scaling else "original", MAPE_train))
-        print("CV RMSE ({}) train data: {}".format("scaled" if apply_scaling else "original", RMSE_train))        
+            MAPE_train = - np.round(cv_scores["test_original_neg_mape"].mean(), 4) * 100
+            RMSE_train = - np.round(cv_scores["test_original_neg_rmse"].mean(), 2)
+        print("CV MAPE ({}) train data: {} %".format("scaled" if apply_scaling else "original", MAPE_train))
+        print("CV RMSE ({}) train data: {}".format("scaled" if apply_scaling else "original", RMSE_train))
         print("CV computation time:", cv_computation_time)
     
     # Compute test scores if compute_test_scores == True
@@ -424,13 +489,13 @@ def fun_scores(model, X_train, y_train, X_test=None, y_test=None, apply_scaling=
         RMSE_cat = X_test.groupby(by="Number " + entities).apply(lambda group: root_mean_squared_error(y_true=y_test.loc[group.index], y_pred=y_pred.loc[group.index]))
 
         # Round results and merge them into a data frame
-        MAPE_cat = np.round(MAPE_cat, 6) * 100
-        RMSE_cat = np.round(RMSE_cat, 4)
+        MAPE_cat = np.round(MAPE_cat, 4) * 100
+        RMSE_cat = np.round(RMSE_cat, 2)
         df = pd.DataFrame(data=[MAPE_cat, RMSE_cat], index=["MAPE", "RMSE"])
         df["Mean"] = [MAPE_test, RMSE_test]
 
         # Print results and show data frame of instance size groups
-        print("\nMAPE ({}) test data:  {} %".format("scaled" if apply_scaling else "original", MAPE_test))
+        print("\nMAPE ({}) test data: {} %".format("scaled" if apply_scaling else "original", MAPE_test))
         print("RMSE ({}) test data: {}".format("scaled" if apply_scaling else "original", RMSE_test))
         if (fit_time is not None): print("Model fit time:", fit_time)
         print("Model prediction time:", prediction_time)
@@ -440,6 +505,42 @@ def fun_scores(model, X_train, y_train, X_test=None, y_test=None, apply_scaling=
                 "Model fit time": fit_time, "Model prediction time": prediction_time, "Scores per instance size": df}
 
     else: return {"MAPE": MAPE_train, "RMSE": RMSE_train, "CV computation time": cv_computation_time}
+
+# Function to evaluate the performance of a benchmark
+def fun_benchmark_evaluation(X_train, X_test, y_train, y_test, benchmark_str, results_dict):
+    # Compute train errors
+    MAPE_train = np.round(mean_absolute_percentage_error(y_true=y_train, y_pred=X_train[benchmark_str]), 4) * 100
+    RMSE_train = np.round(root_mean_squared_error(y_true=y_train, y_pred=X_train[benchmark_str]), 2)
+
+    # Compute test errors
+    MAPE_test = np.round(mean_absolute_percentage_error(y_true=y_test, y_pred=X_test[benchmark_str]), 4) * 100
+    RMSE_test = np.round(root_mean_squared_error(y_true=y_test, y_pred=X_test[benchmark_str]), 2)
+
+    # Connect the train and test scores in a dictionary for the MAPE and RMSE
+    mape_scores = {"Train data": MAPE_train, "Test data": MAPE_test}
+    rmse_scores = {"Train data": RMSE_train, "Test data": RMSE_test}
+
+    # Create a Data Frame with the train and test scores
+    scores_df = pd.DataFrame(data=[mape_scores.values(), rmse_scores.values()], columns=["Train set", "Test set"], index=["MAPE", "RMSE"])
+
+    # Compute error measures in the test set for each instance size group individually
+    entities = "Customers" if ("Number Customers" in X_train.columns) else "Items" # Feature name in TSP and CVRP: "Number Customers", Bin_Packing: "Number Items"
+    MAPE_cat = X_test.groupby(by=f"Number {entities}").apply(
+        lambda group: mean_absolute_percentage_error(y_true=y_test.loc[group.index], y_pred=X_test[benchmark_str].loc[group.index]))
+    RMSE_cat = X_test.groupby(by=f"Number {entities}").apply(
+        lambda group: root_mean_squared_error(y_true=y_test.loc[group.index], y_pred=X_test[benchmark_str].loc[group.index]))
+
+    # Round results and merge them into a data frame
+    MAPE_cat = np.round(MAPE_cat, 4) * 100
+    RMSE_cat = np.round(RMSE_cat, 2)
+    cat_scores_df = pd.DataFrame(data=[MAPE_cat, RMSE_cat], index=["MAPE", "RMSE"])
+    cat_scores_df["Mean"] = [MAPE_test, RMSE_test]
+    display(scores_df, cat_scores_df)
+
+    # Add the data frames to the results_dict
+    results_dict[benchmark_str] = [scores_df, cat_scores_df]
+
+    return results_dict
 
 
 
@@ -455,10 +556,10 @@ def plot_feature_weights(model, n_features):
     # Get feature weights
     if (hasattr(model, "coef_")):
         weights = np.abs(model.coef_)
-        x_label = "Absolute Feature Coefficient"
+        x_label = "Absolute feature coefficient"
     elif (hasattr(model, "feature_importances_")):
         weights = model.feature_importances_
-        x_label = "Feature Importance"
+        x_label = "Feature importance"
     else: 
         print("Error: Plotting feature weights was not possible.")
         print("       Model has neither attribute '.coef' nor attribute '.feature_importances'.")
@@ -485,7 +586,7 @@ def plot_feature_weights(model, n_features):
     plt.xlabel(x_label, size=10, fontweight="bold")
     plt.xlabel(rf"\textbf{{{x_label}}}", size=12)
     plt.ylabel(r"\textbf{Feature}", size=12)
-    plt.title(rf"\textbf{{Feature Importances of {model_name}}}", size=16, color="darkblue")
+    plt.title(rf"\textbf{{Feature importances of {model_name}}}", size=16, color="darkblue")
 
     plt.yticks(np.arange(n_features), weights_dict.keys())
     plt.grid(axis="x", linestyle="--", alpha=0.75)
