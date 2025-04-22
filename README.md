@@ -29,7 +29,7 @@ can be effectively applied to other contexts.
 vehicle routing problem · Machine learning
 
 ## Instructions on how to run the program
-In the `main.py` script, you can define one of the routing problems `"TSP"` or `"CVRP"` 
+In the `main.ipynb` script, you can define one of the routing problems `"TSP"` or `"CVRP"` 
 as the `optimization_problem` variable. After choosing a routing problem, run the script. 
 It will execute the following notebooks and scripts in this order:
 
